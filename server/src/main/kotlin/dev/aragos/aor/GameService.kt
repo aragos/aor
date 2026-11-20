@@ -1,6 +1,7 @@
 package dev.aragos.aor
 
 import dev.aragos.aor.ai.BotDifficulty
+import dev.aragos.aor.ai.HARD_AUTOMATA_VERSION
 import java.security.MessageDigest
 import java.security.SecureRandom
 import java.util.Base64

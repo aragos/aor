@@ -3,6 +3,7 @@ package dev.aragos.aor
 import com.fasterxml.jackson.databind.node.ObjectNode
 import com.google.common.truth.Truth.assertThat
 import dev.aragos.aor.ai.BOT_POLICY_VERSION
+import dev.aragos.aor.ai.HARD_AUTOMATA_VERSION
 import io.ktor.client.HttpClient
 import io.ktor.client.request.bearerAuth
 import io.ktor.client.request.get
@@ -227,7 +228,7 @@ class HostedApplicationTest(private val postgres: Boolean) {
     }
 
     @Test
-    fun onlineGameUsesTheServerPolicyWithoutDisclosingTheBotDecision() = withHosted {
+    fun onlineGameAcceptsTheCreatorsBrowserDecisionForTheVersionedSeat() = withHosted {
         val created =
             post(
                 "/api/games",
@@ -260,19 +261,15 @@ class HostedApplicationTest(private val postgres: Boolean) {
                 "decisionId" to job["decisionId"].asText(),
             )
 
-        val rejected =
-            post(
-                "/api/games/$gameId/bots/commands",
-                "alice",
-                request + ("command" to "bid-capital 10"),
-            )
-        val accepted = post("/api/games/$gameId/bots/commands", "alice", request)
-        val retried = post("/api/games/$gameId/bots/commands", "alice", request)
+        val rejected = post("/api/games/$gameId/bots/commands", "alice", request)
+        val submission = request + ("command" to "bid-capital 10")
+        val accepted = post("/api/games/$gameId/bots/commands", "alice", submission)
+        val retried = post("/api/games/$gameId/bots/commands", "alice", submission)
         val stored = store.read(gameId)
 
-        assertThat(job["serverControlled"].asBoolean()).isTrue()
-        assertThat(job["observation"].isNull).isTrue()
-        assertThat(job["seed"].isNull).isTrue()
+        assertThat(job["policyVersion"].asText()).isEqualTo(HARD_AUTOMATA_VERSION)
+        assertThat(job["observation"]["playerId"].asText()).isEqualTo("p3")
+        assertThat(job["seed"].isInt).isTrue()
         assertThat(rejected.status).isEqualTo(HttpStatusCode.BadRequest)
         assertThat(accepted.status).isEqualTo(HttpStatusCode.OK)
         assertThat(retried.status).isEqualTo(HttpStatusCode.OK)

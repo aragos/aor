@@ -100,7 +100,7 @@ internal fun Route.botRoutes(service: GameService, hosted: HostedServices?) {
                                 ?.string(),
                         seat = PlayerId(body.field("seat").string()),
                         decisionId = body.field("decisionId").string(),
-                        commandText = body["command"]?.string(),
+                        commandText = body.field("command").string(),
                         operationId = body.field("operationId").string(),
                     )
                 }

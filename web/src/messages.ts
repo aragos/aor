@@ -24,7 +24,7 @@ export const en: Record<string, string> = {
     'bots.difficulty.HARD': 'Hard',
     'bots.experimental': 'Automated opponents play on Hard. They’re experimental and will improve over time.',
     'bots.updated': 'Latest update: {version}.',
-    'bots.hosting': 'The creator keeps the game open to run automated opponents.',
+    'bots.hosting': 'The creator keeps the game open. Their browser runs the opponents and can inspect their hands.',
     'bots.seatCount': '{count} of 6 seats · 3–6 total players required',
     'bots.status.thinking': 'Automated opponent is thinking…',
     'bots.status.waiting': 'Automated opponents are ready for their next decision.',

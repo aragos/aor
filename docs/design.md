@@ -118,26 +118,26 @@ New local and hosted games can include Hard automated seats in their 3–6 seats
 receive memberships or private links. Archives and checkpoints preserve controllers and pending
 decisions. Each new seat records its versioned policy in the game document.
 
-The [browser runner](../web/src/ai/botRunner.ts) coordinates decisions while the creator has the
-game open. For new seats, a fenced request identifies the decision and the server chooses and
-submits the command from the acting seat's view. Legacy browser seats continue using their saved
-difficulty and a local worker that receives the deciding seat's observation and seed. The server
-validates all commands, records them and supplies actual randomness. Reads never execute bots.
+The [browser runner](../web/src/ai/botRunner.ts) runs decisions in a worker while the creator
+has the game open. The server supplies one automated seat's own observation, public information
+and authoritative quotes. The worker loads the recorded policy and chooses a canonical command.
+The server validates and records it, supplies actual randomness, and never runs model inference.
 Writes atomically check lease epoch, revision, decision and private-submission version. UUID/hash
-receipts reconcile retries. The browser receives no private inference inputs for server-controlled
-seats. Sealed amounts stay private until ordinary reveal.
+receipts reconcile retries. Sealed amounts stay private from the other humans until ordinary reveal.
+The creator can inspect the automated seats' inputs and alter their commands.
 
 Only the creator claims, pauses, resumes or takes over the 30-second lease. Regular-turn undo and
 edits retain the runner and its pause state. Other edits and rewinds pause bots and rotate the
 epoch until explicit resume. Completion and closure stop bots. Creator abandonment records
 separate bot consent. Each human still consents.
 
-[HardAutomata.kt](../server/src/main/kotlin/dev/aragos/aor/HardAutomata.kt) binds the published
-checkpoint version to its exact hashed models and player-count settings. The three server resources
-total 304 KiB. Each model is read and compiled on its first automated decision for the applicable
-player count. Replays use recorded commands and outcomes. Older versioned models must remain
-available while saved games reference them. [Training](contributing.md#opponent-training) runs
-independently of production storage.
+[The worker](../web/src/ai/botWorker.ts) selects one hashed, immutable checkpoint model by
+policy version and player count. The three published assets total 304 KiB, with 90–123 KiB
+uncompressed downloaded once per applicable worker (HTTP caching reuses the versioned URL).
+Startup, setup, human-only games and read-only visits do not initialize the worker or fetch the
+models. Replays use recorded commands and outcomes. Keep older policy files available while
+saved games reference them. [Training](contributing.md#opponent-training) runs independently of
+production storage.
 
 ## Lifecycle and activity
 

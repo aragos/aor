@@ -42,10 +42,10 @@ data class PersistentLowBidResponse(val tokenMargin: Int, val earlyBias: Double)
         require(earlyBias in 0.0..2.0) { "The low-bid timing bias must be between zero and two." }
     }
 
-    internal fun appliesTo(view: GameView, actor: PlayerId): Boolean {
-        val rounds = view.pastTokenPurchases.takeLast(3)
+    internal fun appliesTo(input: InitiativeBidInput): Boolean {
+        val rounds = input.pastPurchases.takeLast(3)
         if (rounds.size < 3) return false
-        val rivals = view.players.filter { it.id != actor && it.misery != MiseryStep.CHAOS }
+        val rivals = input.rivals.filterNot(InitiativeRival::inChaos)
         return rivals.any { rival ->
             rounds.count { bids ->
                 val amount = bids[rival.id] ?: return@count false
@@ -56,6 +56,15 @@ data class PersistentLowBidResponse(val tokenMargin: Int, val earlyBias: Double)
         }
     }
 }
+
+/** Timing signals are normalized public/own-seat facts, independent of strategy weights. */
+data class PhaseInitiativeInput(
+    val bids: InitiativeBidInput,
+    val earlyPayout: Double,
+    val buyingCard: Double,
+    val earlyCompetition: Double,
+    val secureMarkets: Double,
+)
 
 /** Price earlier and later positions from the acting seat's hand and the public board. */
 object PhaseInitiativePolicy {
@@ -109,7 +118,16 @@ object PhaseInitiativePolicy {
         seed: Int,
         config: PhaseInitiativeConfig,
     ): String {
-        if (view.pastTokenPurchases.size < 2) return ordinary
+        val input = project(view, actor, config.allocation.planWeight > 0.0) ?: return ordinary
+        return bid(input, actor, ordinary, seed, config)
+    }
+
+    fun project(
+        view: GameView,
+        actor: PlayerId,
+        includePlans: Boolean = true,
+    ): PhaseInitiativeInput? {
+        if (view.pastTokenPurchases.size < 2) return null
         val payouts = view.commodityPayouts.associateBy { it.commodity }
         val heldAdvantage =
             view.hand.maxOfOrNull { card ->
@@ -136,17 +154,33 @@ object PhaseInitiativePolicy {
                 val box = owner.effectiveBox.coerceAtLeast(1)
                 owner.payout.toDouble() * (2 * box - 1) / (box * box)
             } ?: 0.0
+        return PhaseInitiativeInput(
+            bids = InitiativeBidInput.project(view, actor, includePlans),
+            earlyPayout = (heldAdvantage / 40.0).coerceAtMost(1.0),
+            buyingCard = cardNeed,
+            earlyCompetition = competition,
+            secureMarkets = (exposedPayout / 24.0).coerceAtMost(1.0),
+        )
+    }
+
+    fun bid(
+        input: PhaseInitiativeInput,
+        actor: PlayerId,
+        ordinary: String,
+        seed: Int,
+        config: PhaseInitiativeConfig,
+    ): String {
         val bias =
-            config.lowBidResponse?.takeIf { it.appliesTo(view, actor) }?.earlyBias
+            config.lowBidResponse?.takeIf { it.appliesTo(input.bids) }?.earlyBias
                 ?: config.earlyBias
         val earlier =
             bias +
-                config.earlyPayout * (heldAdvantage / 40.0).coerceAtMost(1.0) +
-                config.buyingCard * cardNeed +
-                config.earlyCompetition * competition
-        val later = config.secureMarkets * (exposedPayout / 24.0).coerceAtMost(1.0)
+                config.earlyPayout * input.earlyPayout +
+                config.buyingCard * input.buyingCard +
+                config.earlyCompetition * input.earlyCompetition
+        val later = config.secureMarkets * input.secureMarkets
         return InitiativePolicy.bid(
-            view,
+            input.bids,
             actor,
             ordinary,
             seed,

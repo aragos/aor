@@ -5,7 +5,7 @@ export type BotRunnerStatus = 'starting' | 'waiting' | 'thinking' | 'other' | 'p
 export interface BotRunnerDependencies {
     runner: (operation: 'claim' | 'renew', epoch: number, signal: AbortSignal) => Promise<BotWork>;
     work: (epoch: number, signal: AbortSignal) => Promise<BotWork>;
-    submit: (work: BotWork, job: BotJob, command: string | undefined, operationId: string, signal: AbortSignal) => Promise<BotWork>;
+    submit: (work: BotWork, job: BotJob, command: string, operationId: string, signal: AbortSignal) => Promise<BotWork>;
     think: (job: BotJob, signal: AbortSignal) => Promise<string>;
     changed: () => Promise<void>;
     suspended: () => boolean;
@@ -69,7 +69,7 @@ export function startBotRunner(initialEpoch: number, dependencies: BotRunnerDepe
                 const job = work.observations[0];
                 if (!job) {status('waiting'); await wait(2000); continue;}
                 status('thinking');
-                const command = job.serverControlled ? undefined : await dependencies.think(job, signal);
+                const command = await dependencies.think(job, signal);
                 if (signal.aborted) return;
                 // Human mutations can change decisions without advancing the public revision.
                 if (dependencies.suspended()) continue;

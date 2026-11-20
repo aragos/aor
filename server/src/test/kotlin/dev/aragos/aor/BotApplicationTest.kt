@@ -1,6 +1,7 @@
 package dev.aragos.aor
 
 import com.google.common.truth.Truth.assertThat
+import dev.aragos.aor.ai.HARD_AUTOMATA_VERSION
 import io.ktor.client.request.bearerAuth
 import io.ktor.client.request.get
 import io.ktor.client.request.post

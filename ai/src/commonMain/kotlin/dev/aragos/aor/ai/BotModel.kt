@@ -12,6 +12,9 @@ import kotlin.math.abs
 
 const val BOT_POLICY_VERSION = "aor-policy-1"
 
+/** Controller identity stored with each seat using the evaluated browser checkpoint. */
+const val HARD_AUTOMATA_VERSION = "aor-hard-2026-11-20-1"
+
 /** Controller strength is independent of the rules and the engine's player identity. */
 enum class BotDifficulty {
     EASY,

@@ -130,6 +130,51 @@ data class InitiativePolicyConfig(
     }
 }
 
+/** Public rivalry facts used to predict order from previously revealed bids. */
+data class InitiativeRival(val id: PlayerId, val cash: Int, val inChaos: Boolean)
+
+/** Seat-safe token quotes and timing inputs. No unrevealed bids enter the input. */
+data class InitiativeBidInput(
+    val offers: List<TokenPurchaseOfferView>,
+    val pastPurchases: List<Map<PlayerId, Int>>,
+    val capitalOrder: List<PlayerId>,
+    val rivals: List<InitiativeRival>,
+    val turnNumber: Int?,
+    val contestCost: Int?,
+    val opportunityByPool: Map<Int, Double>,
+) {
+    companion object {
+        fun project(view: GameView, player: PlayerId, includePlans: Boolean): InitiativeBidInput {
+            require(view.stage == Stage.TOKEN_PURCHASE) {
+                "Initiative bids require a purchase window."
+            }
+            val opportunities =
+                if (includePlans && view.expansionForecast != null) {
+                    val plans = BotTokenPlanProjection(view, player)
+                    view.tokenPurchaseOffers
+                        .map(TokenPurchaseOfferView::poolAfter)
+                        .distinct()
+                        .associateWith { plans.plan(it).opportunity }
+                } else emptyMap()
+            return InitiativeBidInput(
+                offers = view.tokenPurchaseOffers,
+                pastPurchases = view.pastTokenPurchases,
+                capitalOrder = view.capitalOrder,
+                rivals =
+                    view.players
+                        .filter { it.id != player }
+                        .map {
+                            InitiativeRival(it.id, it.cash, it.misery == MiseryStep.CHAOS)
+                        },
+                turnNumber = view.turnNumber,
+                contestCost =
+                    view.expansionForecast?.contestedMarkets?.minOfOrNull { it.requiredTokens },
+                opportunityByPool = opportunities,
+            )
+        }
+    }
+}
+
 /** Compare candidate bids against joint rows of strictly past, publicly revealed purchases. */
 object InitiativePolicy {
     fun bid(
@@ -139,23 +184,39 @@ object InitiativePolicy {
         seed: Int,
         config: InitiativePolicyConfig,
         orderWeight: Double = 1.0,
+    ): String =
+        bid(
+            InitiativeBidInput.project(view, player, config.planWeight > 0.0),
+            player,
+            normal,
+            seed,
+            config,
+            orderWeight,
+        )
+
+    fun bid(
+        input: InitiativeBidInput,
+        player: PlayerId,
+        normal: String,
+        seed: Int,
+        config: InitiativePolicyConfig,
+        orderWeight: Double,
     ): String {
-        require(view.stage == Stage.TOKEN_PURCHASE) { "Initiative bids require a purchase window." }
         require(orderWeight.isFinite()) { "Initiative order weight must be finite." }
         if (config.participation == 0.0) return normal
-        val hasHistory = view.pastTokenPurchases.isNotEmpty()
+        val hasHistory = input.pastPurchases.isNotEmpty()
         if (!hasHistory && config.openingSpread == 0 && config.openingMix == null) return normal
         val draw = TerritoryPolicy.uniform(seed xor 0x6EA14F52)
         if (draw >= config.participation) return normal
-        if (!hasHistory && view.turnNumber == 1 && config.openingMix != null) {
+        if (!hasHistory && input.turnNumber == 1 && config.openingMix != null) {
             val mix = config.openingMix
-            val capitalPosition = view.capitalOrder.indexOf(player)
-            val later = capitalPosition >= (view.capitalOrder.size + 1) / 2
+            val capitalPosition = input.capitalOrder.indexOf(player)
+            val later = capitalPosition >= (input.capitalOrder.size + 1) / 2
             val chooseMix =
                 mix.participation == 1.0 ||
                     TerritoryPolicy.uniform(seed xor 0x2A68C5D9) < mix.participation
             if (chooseMix && (!later || !mix.retainOrdinaryForLaterCapital)) {
-                val legal = mix.offered(view.tokenPurchaseOffers, later)
+                val legal = mix.offered(input.offers, later)
                 if (legal.isNotEmpty()) {
                     val drawWithinOffers =
                         TerritoryPolicy.uniform(seed xor 0x6F7B4439) * legal.sumOf { it.second }
@@ -169,11 +230,11 @@ object InitiativePolicy {
             }
         }
         val originalAmount = LocalTokenNeighborPolicy.amount(normal)
-        val original = view.tokenPurchaseOffers.single { it.amount == originalAmount }
+        val original = input.offers.single { it.amount == originalAmount }
         if (original.tokensReceived == 0) return normal
-        val contest = view.expansionForecast?.contestedMarkets?.minOfOrNull { it.requiredTokens }
+        val contest = input.contestCost
         val smaller =
-            view.tokenPurchaseOffers.filter { quote ->
+            input.offers.filter { quote ->
                 quote.amount in 1 until original.amount &&
                     original.tokensReceived - quote.tokensReceived <= config.maximumTokenLoss &&
                     (!config.requireAffordableContest ||
@@ -186,28 +247,24 @@ object InitiativePolicy {
         val larger =
             if (config.maximumExtraTokens == 0) emptyList()
             else {
-                view.tokenPurchaseOffers.filter { quote ->
+                input.offers.filter { quote ->
                     quote.amount > original.amount &&
                         quote.tokensReceived - original.tokensReceived in
                             1..config.maximumExtraTokens &&
                         quote.cost - original.cost in 1..config.maximumExtraTokens
                 }
             }
-        val plans =
-            if (config.planWeight > 0.0 && view.expansionForecast != null) {
-                BotTokenPlanProjection(view, player)
-            } else null
-        val originalPlan = plans?.plan(original.poolAfter)?.opportunity ?: 0.0
-        val boxes = OrderBoxes.forPlayers(view.players.size)
-        val priority = view.capitalOrder.withIndex().associate { it.value to it.index }
+        val originalPlan = input.opportunityByPool[original.poolAfter] ?: 0.0
+        val boxes = OrderBoxes.forPlayers(input.rivals.size + 1)
+        val priority = input.capitalOrder.withIndex().associate { it.value to it.index }
         val priorityOfPlayer =
             requireNotNull(priority[player]) { "The bidder needs a capital choice." }
-        val rivals = view.players.filter { it.id != player }
-        val rows = view.pastTokenPurchases.takeLast(4)
+        val rivals = input.rivals
+        val rows = input.pastPurchases.takeLast(4)
         val predictions = rows.map { bids ->
             rivals.map { rival ->
                 val bid =
-                    if (rival.misery == MiseryStep.CHAOS) 0
+                    if (rival.inChaos) 0
                     else
                         requireNotNull(bids[rival.id]) { "A revealed row needs every rival's bid." }
                 val cash = rival.cash.coerceAtLeast(0)
@@ -222,7 +279,7 @@ object InitiativePolicy {
         val totalWeight = weights.sum()
         val expectedCounters =
             if (config.counterAnticipation > 0.0) {
-                BidResponseForecast.next(view.pastTokenPurchases, player, rivals)
+                BidResponseForecast.next(input.pastPurchases, player, rivals)
             } else emptyMap()
         val responses =
             if (expectedCounters.isEmpty()) null
@@ -251,7 +308,7 @@ object InitiativePolicy {
             orderWeight * (baselineBox - expectedBox(quote.amount)) -
                 config.tokenPenalty * (original.tokensReceived - quote.tokensReceived) +
                 config.planWeight *
-                    ((plans?.plan(quote.poolAfter)?.opportunity ?: 0.0) - originalPlan) -
+                    ((input.opportunityByPool[quote.poolAfter] ?: 0.0) - originalPlan) -
                 config.extraCashPenalty * (quote.cost - original.cost).coerceAtLeast(0)
         val scored = (smaller + larger).map { it to gain(it) }.filter { it.second > 0.0 }
         val (best, bestScore) =

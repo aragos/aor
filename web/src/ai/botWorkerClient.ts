@@ -37,7 +37,8 @@ export function createBotWorkerClient() {
             current.addEventListener('message', message);
             current.addEventListener('error', failed);
             signal.addEventListener('abort', cancel, {once: true});
-            current.postMessage({id, observation: job.observation, difficulty: job.difficulty, seed: job.seed});
+            const {observation, difficulty, seed, policyVersion, initiative, finish} = job;
+            current.postMessage({id, observation, difficulty, seed, policyVersion, initiative, finish});
         });
     }
     return {think, stop};

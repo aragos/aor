@@ -1,31 +1,11 @@
 package dev.aragos.aor
 
-/** Public score thresholds for replacing a pass with a legal final-advance purchase. */
-data class FinalAdvanceGuard(val currentLead: Int, val projectedLead: Int) {
-    init {
-        require(currentLead in 1..1000 && projectedLead in 1..1000) {
-            "Finish thresholds must both be positive and at most 1,000 score points."
-        }
-    }
-
-    /** Evaluate a proposed pass against the same authoritative purchase state and actor view. */
-    fun choose(
-        state: GameState,
-        view: GameView,
-        actor: PlayerId,
-        ordinary: String,
-    ): String? {
-        if (ordinary != "pass") return null
-        val own = view.scores.firstOrNull { it.player == actor }?.total ?: return null
-        val rival =
-            view.scores.filter { it.player != actor }.mapNotNull { it.total }.maxOrNull()
-                ?: return null
-        if (own.toLong() - rival < currentLead) return null
-        return FinalAdvancePlan.find(state, actor, ordinary)
-            ?.takeIf { it.projectedMargin >= projectedLead }
-            ?.firstCommand
-    }
-}
+/** Best legal same-phase finish and its margin in public score points. */
+data class FinalAdvanceOffer(
+    val command: String,
+    val currentMargin: Long,
+    val projectedMargin: Long,
+)
 
 /** An exact same-phase purchase order and its score margin at the current board and income. */
 class FinalAdvancePlan
@@ -40,7 +20,19 @@ private constructor(
         const val VERSION = "final-advance-plan-1"
         const val MAXIMUM_REMAINING = 4
 
-        internal fun find(state: GameState, actor: PlayerId, ordinary: String): FinalAdvancePlan? {
+        /** Quote a finish without committing commands or predicting future hidden outcomes. */
+        fun quote(state: GameState, view: GameView, actor: PlayerId): FinalAdvanceOffer? {
+            val own = view.scores.firstOrNull { it.player == actor }?.total ?: return null
+            val rival =
+                view.scores.filter { it.player != actor }.mapNotNull { it.total }.maxOrNull()
+                    ?: return null
+            val currentMargin = own.toLong() - rival
+            if (currentMargin <= 0) return null
+            val plan = find(state, actor, "pass") ?: return null
+            return FinalAdvanceOffer(plan.firstCommand, currentMargin, plan.projectedMargin)
+        }
+
+        private fun find(state: GameState, actor: PlayerId, ordinary: String): FinalAdvancePlan? {
             val remaining = AdvanceId.entries.size - state.playerState(actor).advances.owned.size
             if (state.endingTriggered || remaining !in 1..MAXIMUM_REMAINING) return null
 

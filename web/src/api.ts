@@ -168,8 +168,9 @@ export interface BotAutomation {
     canControl: boolean; paused: boolean; epoch: number;
 }
 export interface BotJob {
-    seat: string; difficulty: BotDifficulty; seed: number | null; decisionId: string;
-    submissionVersion: string | null; observation: unknown; serverControlled?: boolean;
+    seat: string; difficulty: BotDifficulty; seed: number; decisionId: string;
+    submissionVersion: string | null; observation: unknown;
+    policyVersion?: string; initiative?: unknown; finish?: unknown;
 }
 export interface BotWork {
     revision: number; epoch: number; leaseUntil: number; paused: boolean;

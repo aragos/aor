@@ -14,6 +14,7 @@ export default defineConfig({
         },
     }],
     resolve: {alias: {'aor-ai': fileURLToPath(new URL('../ai/build/dist/js/productionLibrary/aor-ai.mjs', import.meta.url))}},
+    worker: {format: 'es'},
     build: {
         outDir: 'dist',
         emptyOutDir: true,

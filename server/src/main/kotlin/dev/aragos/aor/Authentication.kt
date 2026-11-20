@@ -5,6 +5,7 @@ import com.google.firebase.FirebaseApp
 import com.google.firebase.FirebaseOptions
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.FirebaseAuthException
+import dev.aragos.aor.ai.HARD_AUTOMATA_VERSION
 import java.time.Clock
 import java.util.UUID
 

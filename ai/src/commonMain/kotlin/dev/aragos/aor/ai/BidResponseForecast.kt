@@ -1,8 +1,6 @@
 package dev.aragos.aor.ai
 
-import dev.aragos.aor.MiseryStep
 import dev.aragos.aor.PlayerId
-import dev.aragos.aor.PlayerView
 
 /** Infer one-step counters only from prior completed, jointly revealed bids. */
 internal object BidResponseForecast {
@@ -11,7 +9,7 @@ internal object BidResponseForecast {
     fun next(
         history: List<Map<PlayerId, Int>>,
         player: PlayerId,
-        rivals: List<PlayerView>,
+        rivals: List<InitiativeRival>,
     ): Map<PlayerId, Int> {
         val observed = history.takeLast(8)
         if (observed.size < 4) return emptyMap()
@@ -26,7 +24,7 @@ internal object BidResponseForecast {
             )
         return buildMap {
             for (rival in rivals) {
-                if (rival.misery == MiseryStep.CHAOS) continue
+                if (rival.inChaos) continue
                 val responses = comparisons.map { index ->
                     requireNotNull(observed[index][rival.id]) {
                         "A revealed row needs every rival's prior bid."
