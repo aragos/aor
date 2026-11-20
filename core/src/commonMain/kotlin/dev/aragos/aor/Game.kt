@@ -1,5 +1,7 @@
 package dev.aragos.aor
 
+import kotlinx.collections.immutable.toPersistentList
+
 const val RULES_VERSION = "ah1996-three-epoch-5"
 const val LEGACY_RULES_VERSION = "ah1996-three-epoch-4"
 const val DATA_VERSION = "ah1996-catalog-16"
@@ -119,9 +121,14 @@ data class GameState(
     val capitalSelection: CapitalSelection = CapitalSelection(),
     val turnNumber: Int? = null,
     val turnOrderSelection: TurnOrderSelection = TurnOrderSelection(),
+    /** Bounded simultaneous reveals, oldest first, reconstructed from commands during replay. */
+    internal val recentTokenPurchases: List<Map<PlayerId, Int>> = emptyList(),
 ) {
     /** Derived board queries are shared only within this immutable game snapshot. */
     internal val boardContext: BoardRulesContext by lazy { BoardGame.context(this) }
+    /** Card resolution and previews reuse the exact inputs from this immutable snapshot. */
+    internal val cardContext: CardContext by lazy { buildCardContext() }
+    internal val commonView: GameView.Common by lazy { GameView.Common(this) }
 
     val catalog: CatalogConfiguration by lazy {
         CatalogConfiguration(playerIds.size, rules, CatalogVersion.fromWire(header.dataVersion))
@@ -179,14 +186,39 @@ data class GameState(
             flow.decisions.lastOrNull() as? TurnDecision.Roll
         }
 
-    fun legalChoices(player: PlayerId): LegalChoices {
-        playerState(player)
-        return if (stage.isTurnPhase || flow.decisions.isNotEmpty()) {
-            TurnEngine.choices(this, player)
-        } else {
-            stage.legalChoices(state = this, player = player)
+    // Derived queries belong to this immutable snapshot, outside equality and recorded state.
+    // Each seat is computed only when requested. Copies own new caches, including sealed choices.
+    private val choicesByPlayer by lazy {
+        players.keys.associateWith { player ->
+            lazy {
+                val choices =
+                    if (stage.isTurnPhase || flow.decisions.isNotEmpty()) {
+                        TurnEngine.choices(this, player)
+                    } else {
+                        stage.legalChoices(state = this, player = player)
+                    }
+                choices.copy(commands = choices.commands.toPersistentList())
+            }
         }
     }
+
+    fun legalChoices(player: PlayerId): LegalChoices {
+        playerState(player)
+        return checkNotNull(choicesByPlayer[player]) {
+                "A registered player requires an owned legal-choice query: $player."
+            }
+            .value
+    }
+
+    // Both views of the active seat share these immutable quotes for this snapshot.
+    private val expansionQuotes by lazy { ExpansionProjection.quotes(this) }
+
+    internal fun expansionQuotesFor(viewer: PlayerId?): ExpansionProjection.Quotes =
+        if (stage == Stage.EXPANSION && viewer != null && viewer == flow.actor) {
+            expansionQuotes
+        } else {
+            ExpansionProjection.Quotes.EMPTY
+        }
 
     fun viewForPlayer(player: PlayerId): GameView =
         GameView.forViewer(state = this, viewer = playerState(player))

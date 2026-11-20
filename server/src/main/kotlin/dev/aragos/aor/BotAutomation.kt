@@ -1,5 +1,6 @@
 package dev.aragos.aor
 
+import dev.aragos.aor.ai.BOT_POLICY_VERSION
 import dev.aragos.aor.ai.BotDifficulty
 import dev.aragos.aor.ai.BotObservation
 import dev.aragos.aor.ai.BotObservations
@@ -7,7 +8,7 @@ import java.security.MessageDigest
 import java.util.UUID
 
 /** A new automated seat; its display name is fixed when the game is created. */
-data class AutomatedPlayerRequest(val name: String, val difficulty: BotDifficulty) {
+data class AutomatedPlayerRequest(val name: String) {
     init {
         require(name.isNotBlank() && name == name.trim() && name.length <= 60) {
             "An automated player requires a trimmed display name of one through 60 characters."
@@ -95,13 +96,14 @@ data class AutomationView(
 data class BotDecisionWork(
     val seat: PlayerId,
     val difficulty: BotDifficulty,
-    val seed: Int,
+    val seed: Int?,
     val decisionId: String,
     val submissionVersion: String?,
-    val observation: BotObservation,
+    val observation: BotObservation?,
+    val serverControlled: Boolean,
 )
 
-/** Creator-only work; each observation belongs to exactly one automated seat. */
+/** Creator-only work. Only legacy browser seats include private inference inputs. */
 data class BotWork(
     val revision: Int,
     val epoch: Int,
@@ -111,7 +113,7 @@ data class BotWork(
     val operationReceipts: List<String>,
 )
 
-/** Client-computed commands pass through the ordinary authority driver under the game lock. */
+/** Fenced automated decisions use the ordinary authority driver under the game lock. */
 internal object BotAutomation {
     private const val LEASE_MILLIS = 30000L
 
@@ -271,13 +273,16 @@ internal object BotAutomation {
         expectedSubmissionVersion: String?,
         seat: PlayerId,
         decisionId: String,
-        commandText: String,
+        commandText: String?,
         operationId: String,
         now: Long = System.currentTimeMillis(),
     ): BotWork {
         requireUuid(runnerId)
         requireUuid(operationId)
-        if (commandText.length !in 1..200 || '\n' in commandText || '\r' in commandText) {
+        if (
+            commandText != null &&
+                (commandText.length !in 1..200 || '\n' in commandText || '\r' in commandText)
+        ) {
             throw ServiceFailure(400, "INVALID_REQUEST")
         }
         val requestHash =
@@ -314,8 +319,26 @@ internal object BotAutomation {
                 if (expectedSubmissionVersion != current.submissionVersions[seat]) {
                     throw ServiceFailure(409, "STALE_SUBMISSION")
                 }
-                val command = TextCodec.parseCommand(commandText)
-                if (command.toText() != commandText) throw ServiceFailure(400, "INVALID_COMMAND")
+                val bot =
+                    checkNotNull(current.bots[seat]) {
+                        "A ready automated seat requires its saved controller."
+                    }
+                val action =
+                    when (bot.policyVersion) {
+                        HARD_AUTOMATA_VERSION -> {
+                            if (commandText != null) throw ServiceFailure(400, "INVALID_REQUEST")
+                            HardAutomata.choose(
+                                current.state(),
+                                seat,
+                                bot.seed xor decisionId.hashCode(),
+                            )
+                        }
+                        BOT_POLICY_VERSION ->
+                            commandText ?: throw ServiceFailure(400, "INVALID_REQUEST")
+                        else -> throw ServiceFailure(503, "BOT_POLICY_UNAVAILABLE")
+                    }
+                val command = TextCodec.parseCommand(action)
+                if (command.toText() != action) throw ServiceFailure(400, "INVALID_COMMAND")
                 val next =
                     try {
                         service.driver.submit(current, seat, command)
@@ -370,13 +393,16 @@ internal object BotAutomation {
                                 "A ready automated seat requires its controller."
                             }
                         val decision = decisionId(game, seat)
+                        val legacy = bot.policyVersion == BOT_POLICY_VERSION
                         BotDecisionWork(
                             seat = seat,
                             difficulty = bot.difficulty,
-                            seed = bot.seed xor decision.hashCode(),
+                            seed = if (legacy) bot.seed xor decision.hashCode() else null,
                             decisionId = decision,
                             submissionVersion = game.submissionVersions[seat],
-                            observation = BotObservations.from(game.state(), seat),
+                            observation =
+                                if (legacy) BotObservations.from(game.state(), seat) else null,
+                            serverControlled = !legacy,
                         )
                     },
             operationReceipts = runner.receipts.map(BotOperationReceipt::operationId),

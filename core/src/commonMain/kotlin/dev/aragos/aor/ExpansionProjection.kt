@@ -1,5 +1,7 @@
 package dev.aragos.aor
 
+import kotlinx.collections.immutable.toPersistentList
+
 enum class ExpansionAction {
     PLACE,
     ATTACK,
@@ -52,6 +54,15 @@ data class MarkerReductionOfferView(
 )
 
 internal object ExpansionProjection {
+    class Quotes(
+        val inspections: List<ExpansionOfferView>,
+        val offers: List<ExpansionOfferView>,
+    ) {
+        companion object {
+            val EMPTY = Quotes(emptyList(), emptyList())
+        }
+    }
+
     fun reductions(state: GameState, viewer: PlayerState): List<MarkerReductionOfferView> =
         state
             .legalChoices(viewer.player.id)
@@ -73,26 +84,29 @@ internal object ExpansionProjection {
                 )
             }
 
-    /** All current destination evaluations, including failures excluded from candidate offers. */
-    fun inspections(state: GameState, viewer: PlayerState): List<ExpansionOfferView> {
-        if (
-            state.stage != Stage.EXPANSION ||
-                state.flow.actor != viewer.player.id ||
-                state.flow.decisions.isNotEmpty() ||
-                viewer.misery == MiseryStep.CHAOS
-        ) {
-            return emptyList()
+    /** Immutable destination evaluations and offers for the snapshot's ordinary expansion actor. */
+    fun quotes(state: GameState): Quotes {
+        if (state.flow.decisions.isNotEmpty()) {
+            return Quotes.EMPTY
         }
+        val actor = checkNotNull(state.flow.actor) { "An expansion quote requires an actor." }
+        val viewer = state.playerState(actor)
+        if (viewer.misery == MiseryStep.CHAOS) {
+            return Quotes.EMPTY
+        }
+        val incomeBefore = IncomeView.from(state, viewer)?.ordinary
         val context = state.boardContext
-        return context.configuration.provinces.map { province ->
-            offer(state, viewer, context, province)
-        }
+        val inspections =
+            context.configuration.provinces
+                .map { province -> offer(state, viewer, context, province, incomeBefore) }
+                .toPersistentList()
+        return Quotes(inspections, offers(inspections).toPersistentList())
     }
 
     /**
      * Keep impossible pool/shipping commitments inspectable without offering them as candidates.
      */
-    fun offers(inspections: List<ExpansionOfferView>): List<ExpansionOfferView> =
+    private fun offers(inspections: List<ExpansionOfferView>): List<ExpansionOfferView> =
         inspections.filter { offer ->
             offer.blockers.none { blocker ->
                 blocker == ViolationCode.INSUFFICIENT_EXPANSION_TOKENS ||
@@ -105,6 +119,7 @@ internal object ExpansionProjection {
         viewer: PlayerState,
         context: BoardRulesContext,
         province: ProvinceDefinition,
+        incomeBefore: Int?,
     ): ExpansionOfferView {
         val player = viewer.player.id
         val occupants = state.board.pieces[province.id]
@@ -130,7 +145,6 @@ internal object ExpansionProjection {
                 contested -> BoardGame.attackTokens(context, player, province.id)
                 else -> province.marketNumber - existing
             }
-        val income = IncomeView.from(state, viewer)?.ordinary
         val routes =
             if (controlled) emptyList() else ExpansionReach.routesTo(context, player, province.id)
         val evaluated =
@@ -138,15 +152,21 @@ internal object ExpansionProjection {
         val plan = evaluated?.plan
         val blocker = evaluated?.blocker
         val partial =
-            if (controlled) {
+            if (routes.isEmpty()) {
                 emptyList()
             } else {
-                // A province has at most six spaces. Never enumerate pool-sized commitments.
-                (1 until province.marketNumber).mapNotNull { tokens ->
+                val limit =
+                    minOf(
+                        province.marketNumber - 1,
+                        viewer.poolTokens,
+                        BoardPlacementRules.peacefulCapacity(occupants, province.marketNumber),
+                    )
+                (1..limit).mapNotNull { tokens ->
+                    if (tokens == required) return@mapNotNull null
                     val candidate =
                         evaluate(context, viewer, province.id, tokens, routes).plan
                             as? PlacementPlan.Peaceful
-                    if (candidate == null || tokens == required) {
+                    if (candidate == null) {
                         null
                     } else {
                         PartialPlacementView(tokens, viewer.poolTokens - tokens)
@@ -174,15 +194,15 @@ internal object ExpansionProjection {
             if (plan == null) null else viewer.poolTokens - required,
             !province.isSatellite && !controlled,
             contested,
-            listOfNotNull(blocker),
-            partial,
+            listOfNotNull(blocker).toPersistentList(),
+            partial.toPersistentList(),
             shipping,
-            income,
+            incomeBefore,
             after?.let { board -> IncomeView.from(state, viewer, board)?.ordinary },
             routes.isNotEmpty(),
-            province.access.filterNot { requirement ->
-                requirement.isSatisfiedBy(viewer.advances.owned)
-            },
+            province.access
+                .filterNot { requirement -> requirement.isSatisfiedBy(viewer.advances.owned) }
+                .toPersistentList(),
             if (contested) {
                 val defenders =
                     when (occupants) {
@@ -190,12 +210,14 @@ internal object ExpansionProjection {
                         else -> holdings.keys - player
                     }
                 CompetitionRules.greenWinningRolls(
-                    orderBox =
-                        requireNotNull(state.orderBoxes[player]) {
-                            "An expansion attacker requires a resolved printed order box."
-                        },
-                    proselytism = CompetitionRules.proselytismApplies(context, player, defenders),
-                )
+                        orderBox =
+                            requireNotNull(state.orderBoxes[player]) {
+                                "An expansion attacker requires a resolved printed order box."
+                            },
+                        proselytism =
+                            CompetitionRules.proselytismApplies(context, player, defenders),
+                    )
+                    .toPersistentList()
             } else null,
             (plan as? PlacementPlan.Competition)?.let { competition ->
                 val greenWins =
@@ -217,41 +239,25 @@ internal object ExpansionProjection {
         )
     }
 
-    private data class Evaluation(
-        val plan: PlacementPlan? = null,
-        val blocker: ViolationCode? = null,
-    )
-
     private fun evaluate(
         context: BoardRulesContext,
         viewer: PlayerState,
         province: ProvinceId,
         tokens: Int,
         routes: List<ExpansionRoute>,
-    ): Evaluation {
+    ): PlacementAssessment {
         if (
             !ExpansionReach.canEnter(context.player(viewer.player.id), context.province(province))
         ) {
-            return Evaluation(blocker = ViolationCode.PROVINCE_ACCESS_DENIED)
+            return PlacementAssessment(ViolationCode.PROVINCE_ACCESS_DENIED)
         }
-        var firstFailure: ViolationCode? = null
-        for (route in routes) {
-            try {
-                return Evaluation(
-                    plan =
-                        BoardPlacementRules.evaluate(
-                            context,
-                            viewer.player.id,
-                            province,
-                            tokens,
-                            route,
-                            viewer.poolTokens,
-                        )
-                )
-            } catch (failure: RuleViolation) {
-                if (firstFailure == null) firstFailure = failure.code
-            }
-        }
-        return Evaluation(blocker = firstFailure ?: ViolationCode.UNREACHABLE_PROVINCE)
+        return BoardPlacementRules.assessGeneratedRoutes(
+            context,
+            viewer.player.id,
+            province,
+            tokens,
+            viewer.poolTokens,
+            routes,
+        )
     }
 }

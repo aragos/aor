@@ -1,7 +1,7 @@
 # Age of Renaissance
 
 Complete, replayable three-epoch games for 3–6 players: Kotlin Multiplatform rules, Ktor authority
-and persistence, React table, and local automated opponents.
+and persistence, React table, and experimental automated opponents.
 
 ## Run locally
 

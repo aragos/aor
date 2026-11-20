@@ -1,6 +1,7 @@
 package dev.aragos.aor.ai
 
 import dev.aragos.aor.AdvanceId
+import dev.aragos.aor.CardChoiceKind
 import dev.aragos.aor.CardChoiceView
 import dev.aragos.aor.CardCommand
 import dev.aragos.aor.CardKind
@@ -19,6 +20,7 @@ import dev.aragos.aor.Prompt
 import dev.aragos.aor.ProvinceDefinition
 import dev.aragos.aor.ProvinceId
 import dev.aragos.aor.RULES_VERSION
+import dev.aragos.aor.TokenPurchaseOfferView
 import kotlin.math.abs
 
 /**
@@ -27,6 +29,38 @@ import kotlin.math.abs
  * evaluation, variation, and bounded planning run in the client.
  */
 object BotObservations {
+    /**
+     * Retain an already-authorized exact quote for tracing an opt-in unoffered purchase. This
+     * projection is created after baseline inference and never changes its scored candidates.
+     */
+    fun withQuotedTokenPurchase(
+        view: GameView,
+        observation: BotObservation,
+        quote: TokenPurchaseOfferView,
+    ): Pair<GameView, BotObservation> {
+        require(observation.decision == "buy-tokens") {
+            "Only a token observation may retain an accepted purchase quote."
+        }
+        require(
+            observation.candidates.none { it.command == "buy-tokens ${quote.amount}" } &&
+                view.tokenPurchaseOffers.none { it.amount == quote.amount }
+        ) {
+            "Only a previously unoffered exact token quote may augment the accepted trace."
+        }
+        val quotedView = view.copy(tokenPurchaseOffers = view.tokenPurchaseOffers + quote)
+        val projected =
+            ObservationProjection(
+                    quotedView,
+                    LegalChoices(),
+                    PlayerId(observation.playerId),
+                    "buy-tokens",
+                    observation.rulesVersion,
+                )
+                .build()
+        val candidate = projected.candidates.single { it.command == "buy-tokens ${quote.amount}" }
+        return quotedView to observation.copy(candidates = observation.candidates + candidate)
+    }
+
     fun from(state: GameState, seat: PlayerId): BotObservation {
         val prompt = state.prompts().singleOrNull()
         val decision =
@@ -45,16 +79,26 @@ object BotObservations {
                 }
                 else -> error("A bot observation requires a player decision.")
             }
-        return from(state.viewForDecision(seat), state.legalChoices(seat), seat, decision)
+        return from(
+            state.viewForDecision(seat),
+            state.legalChoices(seat),
+            seat,
+            decision,
+            rulesVersion = state.header.rulesVersion,
+        )
     }
 
-    /** Public projection entry point also supports isolated policy and privacy tests. */
+    /**
+     * Public projection entry point also supports isolated policy and privacy tests. [rulesVersion]
+     * is the source game's public header version; callers projecting legacy games must retain it.
+     */
     fun from(
         view: GameView,
         choices: LegalChoices,
         seat: PlayerId,
         decision: String,
-    ): BotObservation = ObservationProjection(view, choices, seat, decision).build()
+        rulesVersion: String = RULES_VERSION,
+    ): BotObservation = ObservationProjection(view, choices, seat, decision, rulesVersion).build()
 }
 
 private class ObservationProjection(
@@ -62,6 +106,7 @@ private class ObservationProjection(
     private val choices: LegalChoices,
     private val seat: PlayerId,
     private val decision: String,
+    private val rulesVersion: String,
 ) {
     private val self = view.players.single { it.id == seat }
     private val catalog =
@@ -72,6 +117,12 @@ private class ObservationProjection(
         else if (view.currentEpoch == 3) (1.0 - view.deckRemaining / 18.0).coerceIn(0.0, 1.0)
         else 0.0
     private val stabilization = (view.stabilizationCost ?: 0L).toDouble()
+    private val economic by lazy(LazyThreadSafetyMode.NONE) { BotEconomicProjection(view, seat) }
+    private val purchases by lazy(LazyThreadSafetyMode.NONE) { BotPurchaseProjection(view, seat) }
+    private val tokenValue by
+        lazy(LazyThreadSafetyMode.NONE) {
+            BotTokenValueProjection(view, seat, endgame)
+        }
     private val conditions =
         listOf(
             "count.${view.players.size}",
@@ -121,8 +172,30 @@ private class ObservationProjection(
             availableCash = self.cash,
             availableTokens = self.poolTokens,
             candidates = candidates,
-            rulesVersion = RULES_VERSION,
+            rulesVersion = rulesVersion,
             dataVersion = catalog.dataVersion,
+            configuration =
+                BotConfiguration(
+                    playerCount = view.players.size,
+                    map = view.rules.map,
+                    initialCard = view.rules.initialCard,
+                    deckModification = view.rules.deckModification,
+                    immediateMasterArtDiscard = view.rules.immediateMasterArtDiscard,
+                    drawThreeKeepTwo = view.rules.drawThreeKeepTwo,
+                ),
+            expansionPlanning = if (decision == "expand") economic.planning(candidates) else null,
+            reserveShortfallBasis =
+                if (decision == "purchase-advances") {
+                    contextualFeatures(mapOf("reserveShortfall" to 1.0))
+                } else null,
+            advancePlanning =
+                if (decision == "purchase-advances") {
+                    BotAdvancePlanningProjection.from(view, seat, candidates)
+                } else null,
+            leaderPlanning =
+                if (decision == "play-cards") {
+                    BotLeaderProjection.from(view, seat, candidates, endgame)
+                } else null,
         )
     }
 
@@ -221,6 +294,8 @@ private class ObservationProjection(
         var tokenCost = 0
         var family = parts.first()
         var group = command
+        var playerTarget: PlayerId? = null
+        var leaderCash: BotLeaderCash? = null
         fun add(name: String, amount: Double) {
             if (amount != 0.0) features[name] = (features[name] ?: 0.0) + amount
         }
@@ -237,10 +312,10 @@ private class ObservationProjection(
                         "A token purchase candidate requires an owner-visible quote."
                     }
                 cashCost = quote.cost
-                val goal = minOf(self.stockTokens, minOf(16, maxOf(2, self.cash / 4)))
                 add("cash", -cashCost.toDouble())
                 add("tokens", quote.tokensReceived * 0.6)
-                add("tokenPreference", -abs(amount - goal).toDouble())
+                purchases.tokens(quote).forEach { (name, value) -> add(name, value) }
+                features.putAll(tokenValue.features(quote))
             }
             "choose-capital" -> {
                 val province = provinces[ProvinceId(parts[1])]
@@ -261,7 +336,7 @@ private class ObservationProjection(
                                 candidate.access.all { it.isSatisfiedBy(self.advances) }
                         }
                 add(
-                    "capitalOpportunity",
+                    SecondCapitalGeography.FEATURE,
                     available.sumOf { candidate ->
                         (candidate.commodities.sumOf(::commodityMarginal) + 2.0) /
                             candidate.marketNumber
@@ -318,6 +393,9 @@ private class ObservationProjection(
                 add("points", definition.cost.toDouble())
                 add("discount", definition.credit * (1.0 - endgame) * 0.8)
                 addMisery(features, quote.miseryChanges)
+                features.putAll(
+                    purchases.finalAdvanceScore(definition.cost, cashCost, quote.miseryChanges)
+                )
                 add(
                     "reach",
                     when (advance) {
@@ -330,15 +408,11 @@ private class ObservationProjection(
                         else -> 0.0
                     },
                 )
-                add(
-                    "income",
-                    when (advance) {
-                        AdvanceId.MIDDLE_CLASS -> self.boardMarkers.toDouble()
-                        AdvanceId.INTEREST_PROFIT ->
-                            minOf(10, (self.cash - cashCost) / 10).toDouble()
-                        else -> 0.0
-                    },
-                )
+                purchases.advanceIncome(advance, cashCost, endgame).forEach { (name, value) ->
+                    add(name, value)
+                }
+                features.putAll(purchases.publicAdvancePressure(advance))
+                features.putAll(purchases.advanceAbilities(advance))
                 add(
                     "military",
                     when (advance) {
@@ -356,6 +430,7 @@ private class ObservationProjection(
                 cashCost = offer.cost
                 add("cash", -cashCost.toDouble())
                 add("reach", 6.0)
+                purchases.shipping(offer).forEach { (name, value) -> add(name, value) }
             }
             "stabilize" -> {
                 if (parts[1] == "cash") {
@@ -395,6 +470,9 @@ private class ObservationProjection(
                 tokenCost =
                     if (parts.first() == "attack") offer.requiredTokens else parts[1].toInt()
                 expansionFeatures(features, province, offer, tokenCost)
+                economic.expansion(province, offer, tokenCost).forEach { (name, amount) ->
+                    add(name, amount)
+                }
             }
             "buy-card",
             "buy-expansion-card" -> {
@@ -420,16 +498,27 @@ private class ObservationProjection(
                 val offer = view.cardOffers.single { it.reference == parts[1] }
                 val card = view.hand.single { it.reference == parts[1] }
                 val choice = offer.choices.firstOrNull { it.command == command }
+                if (choice?.kind == CardChoiceKind.PLAYER) {
+                    playerTarget =
+                        PlayerId(
+                            requireNotNull(choice.value) {
+                                "An authorized player card choice requires its target."
+                            }
+                        )
+                }
                 add("card.${card.definition.id}", 1.0)
                 add("progress", 1.0)
                 add("cash", stabilizationReduction())
                 if (choice != null) {
+                    economic.area(choice).forEach { (name, value) -> add(name, value) }
                     addMisery(features, choice.miseryChanges)
-                    choice.cashChanges.forEach { change ->
-                        add(
-                            if (change.player == seat) "cash" else "opponentCash",
-                            (change.after - change.before).toDouble(),
-                        )
+                    if (card.definition.kind != CardKind.LEADER) {
+                        choice.cashChanges.forEach { change ->
+                            add(
+                                if (change.player == seat) "cash" else "opponentCash",
+                                (change.after - change.before).toDouble(),
+                            )
+                        }
                     }
                 } else {
                     addMisery(features, offer.miseryChanges)
@@ -444,9 +533,11 @@ private class ObservationProjection(
                     )
                     if (parts.getOrNull(2) == "protect") {
                         cashCost = parts[3].toInt()
-                        add("cash", -cashCost.toDouble())
                         add("protection", cashCost.toDouble())
                     }
+                    val outcome = BotLeaderCash.from(offer, seat, self.cash, cashCost)
+                    leaderCash = outcome
+                    add("cash", outcome.change.toDouble())
                 }
                 if (parts.getOrNull(2) == "provinces" || parts.getOrNull(2) == "province") {
                     parts.drop(3).map(::ProvinceId).forEach { province ->
@@ -457,6 +548,7 @@ private class ObservationProjection(
                 if (card.definition.id in setOf("armor", "stirrups", "long-bow", "gunpowder")) {
                     add("military", 1.0)
                 }
+                economic.card(card.reference).forEach { (name, amount) -> add(name, amount) }
             }
             "replace-event-tokens" -> {
                 val selected = parts.drop(1).filterNot { it == "none" }.map(::ProvinceId)
@@ -536,21 +628,38 @@ private class ObservationProjection(
                 add("tokens", (quote.poolAfter - quote.poolBefore).toDouble())
             }
         }
-        if (cashCost > 0 && decision != "purchase-stabilization") {
+        val cashAfter = leaderCash?.after ?: (self.cash - cashCost)
+        val interest =
+            if (leaderCash == null) purchases.foregoneInterest(cashCost)
+            else purchases.interestAfterCash(cashAfter)
+        interest.forEach { (name, value) -> add(name, value) }
+        if (cashAfter != self.cash && decision != "purchase-stabilization") {
             val before = (stabilization - self.cash).coerceAtLeast(0.0)
             add(
                 "reserveShortfall",
-                (stabilization - (self.cash - cashCost)).coerceAtLeast(0.0) - before,
+                (stabilization - cashAfter).coerceAtLeast(0.0) - before,
             )
         }
         add("action.$family", 1.0)
-        val base = features.toMap()
+        return BotCandidate(
+            command,
+            contextualFeatures(features),
+            cashCost,
+            tokenCost,
+            group,
+            family,
+            playerTarget,
+        )
+    }
+
+    /** Candidate values and the per-dollar reserve basis share identical context expansion. */
+    private fun contextualFeatures(base: Map<String, Double>): Map<String, Double> = buildMap {
+        putAll(base)
         for ((feature, value) in base) {
-            if (feature.startsWith("capitalHand.")) continue
-            if (endgame != 0.0) features["endgame.$feature"] = value * endgame
-            for (condition in conditions) features["$condition.$feature"] = value
+            if (feature.startsWith("capitalHand.") || feature.startsWith("planning.")) continue
+            if (endgame != 0.0) put("endgame.$feature", value * endgame)
+            for (condition in conditions) put("$condition.$feature", value)
         }
-        return BotCandidate(command, features.toMap(), cashCost, tokenCost, group, family)
     }
 
     private fun expansionFeatures(

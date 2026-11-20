@@ -1,6 +1,6 @@
 package dev.aragos.aor
 
-import dev.aragos.aor.ai.BOT_POLICY_VERSION
+import dev.aragos.aor.ai.BotDifficulty
 import java.security.MessageDigest
 import java.security.SecureRandom
 import java.util.Base64
@@ -127,7 +127,7 @@ class GameService(
                 )
                 .copy(
                     name = name,
-                    bots = botSeats(players.drop(names.size), bots),
+                    bots = botSeats(players.drop(names.size)),
                     botRunner = BotRunnerState().takeIf { bots.isNotEmpty() },
                 )
         )
@@ -187,7 +187,7 @@ class GameService(
                 .copy(
                     name = name,
                     memberships = seats.associate { (seat, account) -> seat to account.id.value },
-                    bots = botSeats(header.players.drop(players.size), bots),
+                    bots = botSeats(header.players.drop(players.size)),
                     botRunner = BotRunnerState().takeIf { bots.isNotEmpty() },
                 )
         )
@@ -802,13 +802,14 @@ class GameService(
     internal fun authenticate(stored: StoredGame, access: GameAccess): PlayerId =
         viewer(stored, access) ?: throw ServiceFailure(403, "GAME_MEMBERSHIP_REQUIRED")
 
-    private fun botSeats(
-        players: List<Player>,
-        requests: List<AutomatedPlayerRequest>,
-    ): Map<PlayerId, AutomatedPlayer> =
-        players.zip(requests).associate { (player, request) ->
+    private fun botSeats(players: List<Player>): Map<PlayerId, AutomatedPlayer> =
+        players.associate { player ->
             player.id to
-                AutomatedPlayer(request.difficulty, BOT_POLICY_VERSION, credentialsRandom.nextInt())
+                AutomatedPlayer(
+                    BotDifficulty.HARD,
+                    HARD_AUTOMATA_VERSION,
+                    credentialsRandom.nextInt(),
+                )
         }
 
     private fun authenticateSeat(stored: StoredGame, token: String): PlayerId {

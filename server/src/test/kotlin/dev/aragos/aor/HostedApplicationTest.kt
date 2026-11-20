@@ -2,7 +2,7 @@ package dev.aragos.aor
 
 import com.fasterxml.jackson.databind.node.ObjectNode
 import com.google.common.truth.Truth.assertThat
-import dev.aragos.aor.ai.BotDifficulty
+import dev.aragos.aor.ai.BOT_POLICY_VERSION
 import io.ktor.client.HttpClient
 import io.ktor.client.request.bearerAuth
 import io.ktor.client.request.get
@@ -163,20 +163,20 @@ class HostedApplicationTest(private val postgres: Boolean) {
     }
 
     @Test
-    fun onlineCreationRejectsAutomatedOpponentsWithoutSavingAGame() = withHosted {
+    fun onlineCreationRejectsUnsupportedDifficultyWithoutSavingAGame() = withHosted {
         val response =
             post(
                 "/api/games",
                 "alice",
                 mapOf(
-                    "players" to listOf("alice", "bob", "carol"),
+                    "players" to listOf("alice", "bob"),
                     "bots" to listOf(mapOf("difficulty" to "EASY")),
                 ),
             )
 
         assertThat(response.status).isEqualTo(HttpStatusCode.BadRequest)
         assertThat(json.readTree(response.bodyAsText())["code"].asText())
-            .isEqualTo("AUTOMATED_OPPONENTS_UNAVAILABLE")
+            .isEqualTo("INVALID_BOT_DIFFICULTY")
         assertThat(store.ids()).isEmpty()
     }
 
@@ -224,6 +224,64 @@ class HostedApplicationTest(private val postgres: Boolean) {
         assertThat(store.read(created.gameId).state()).isEqualTo(state)
         assertThat(store.read(created.gameId).pendingBids[PlayerId("p1")]).isEqualTo(12)
         assertThat(store.read(created.gameId).bots).isEmpty()
+    }
+
+    @Test
+    fun onlineGameUsesTheServerPolicyWithoutDisclosingTheBotDecision() = withHosted {
+        val created =
+            post(
+                "/api/games",
+                "alice",
+                mapOf(
+                    "players" to listOf("alice", "bob"),
+                    "bots" to listOf(emptyMap<String, String>()),
+                ),
+            )
+        assertThat(created.status).isEqualTo(HttpStatusCode.Created)
+        val gameId = json.readTree(created.bodyAsText())["gameId"].asText()
+        val runnerId = UUID.randomUUID().toString()
+        val claimed =
+            post(
+                "/api/games/$gameId/bots/runner",
+                "alice",
+                mapOf("operation" to "claim", "runnerId" to runnerId, "expectedEpoch" to 0),
+            )
+        val work = json.readTree(claimed.bodyAsText())
+        val job = work["observations"].single()
+        val operationId = UUID.randomUUID().toString()
+        val request =
+            mapOf(
+                "expectedRevision" to work["revision"].asInt(),
+                "expectedSubmissionVersion" to null,
+                "runnerId" to runnerId,
+                "epoch" to work["epoch"].asInt(),
+                "operationId" to operationId,
+                "seat" to job["seat"].asText(),
+                "decisionId" to job["decisionId"].asText(),
+            )
+
+        val rejected =
+            post(
+                "/api/games/$gameId/bots/commands",
+                "alice",
+                request + ("command" to "bid-capital 10"),
+            )
+        val accepted = post("/api/games/$gameId/bots/commands", "alice", request)
+        val retried = post("/api/games/$gameId/bots/commands", "alice", request)
+        val stored = store.read(gameId)
+
+        assertThat(job["serverControlled"].asBoolean()).isTrue()
+        assertThat(job["observation"].isNull).isTrue()
+        assertThat(job["seed"].isNull).isTrue()
+        assertThat(rejected.status).isEqualTo(HttpStatusCode.BadRequest)
+        assertThat(accepted.status).isEqualTo(HttpStatusCode.OK)
+        assertThat(retried.status).isEqualTo(HttpStatusCode.OK)
+        assertThat(stored.memberships.keys).containsExactly(PlayerId("p1"), PlayerId("p2"))
+        assertThat(stored.bots.values.single().policyVersion).isEqualTo(HARD_AUTOMATA_VERSION)
+        assertThat(stored.pendingBids.keys).containsExactly(PlayerId("p3"))
+        assertThat(stored.revision).isEqualTo(work["revision"].asInt())
+        assertThat(json.readTree(accepted.bodyAsText())["operationReceipts"].single().asText())
+            .isEqualTo(operationId)
     }
 
     @Test
@@ -970,18 +1028,26 @@ private class HostedFixture(postgres: Boolean) : AutoCloseable {
         )
 
     /** Persists a game supported before online creation stopped offering automated seats. */
-    fun existingAutomatedGame(): CreatedGame =
-        service.createRegistered(
-            players = listOf(hosted.account(AccountIdentity(AccountId("alice"), true))),
-            creator = AccountId("alice"),
-            rules = RuleOptions(),
-            policy = UndoPolicy.REGULAR_TURN,
-            bots =
-                listOf(
-                    AutomatedPlayerRequest("Automated 1", BotDifficulty.NORMAL),
-                    AutomatedPlayerRequest("Automated 2", BotDifficulty.NORMAL),
-                ),
-        )
+    fun existingAutomatedGame(): CreatedGame {
+        val created =
+            service.createRegistered(
+                players = listOf(hosted.account(AccountIdentity(AccountId("alice"), true))),
+                creator = AccountId("alice"),
+                rules = RuleOptions(),
+                policy = UndoPolicy.REGULAR_TURN,
+                bots =
+                    listOf(
+                        AutomatedPlayerRequest("Automated 1"),
+                        AutomatedPlayerRequest("Automated 2"),
+                    ),
+            )
+        val root = json.readTree(store.document(created.gameId)) as ObjectNode
+        for ((_, bot) in root["bots"].properties()) {
+            (bot as ObjectNode).put("difficulty", "NORMAL").put("policyVersion", BOT_POLICY_VERSION)
+        }
+        replaceDocument(created.gameId, root)
+        return created
+    }
 
     fun startedGame(): CreatedGame = game()
 

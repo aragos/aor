@@ -2,6 +2,7 @@ package dev.aragos.aor
 
 import com.fasterxml.jackson.databind.node.ObjectNode
 import com.google.common.truth.Truth.assertThat
+import dev.aragos.aor.ai.BOT_POLICY_VERSION
 import dev.aragos.aor.ai.BotDifficulty
 import java.nio.file.Files
 import java.util.UUID
@@ -338,7 +339,11 @@ class BotAutomationTest(private val postgres: Boolean) {
             fixture.humanCommand("pass")
             val fresh = fixture.read(work.epoch)
             val job = fresh.observations.first()
-            val command = job.observation.candidates.first().command
+            val command =
+                checkNotNull(job.observation) { "Legacy work requires an observation." }
+                    .candidates
+                    .first()
+                    .command
 
             val accepted = fixture.submit(fresh, job, command)
 
@@ -531,16 +536,32 @@ private class AutomationFixture(
 ) : AutoCloseable {
     private val directory = Files.createTempDirectory("aor-bot-test-")
     private val database = if (postgres) PostgresFixture() else null
-    val service = database?.service() ?: createGameService(directory, FixedRandom())
+    private val storage = database?.store ?: FileGameStore(directory)
+    private val legacyCreation =
+        object : ManagedGameStore by storage {
+            override fun create(game: StoredGame) {
+                val legacy =
+                    game.bots.entries
+                        .mapIndexed { index, (seat, bot) ->
+                            seat to
+                                bot.copy(
+                                    difficulty =
+                                        if (index == 0) BotDifficulty.NORMAL
+                                        else BotDifficulty.HARD,
+                                    policyVersion = BOT_POLICY_VERSION,
+                                )
+                        }
+                        .toMap()
+                storage.create(game.copy(bots = legacy))
+            }
+        }
+    val service = GameService(legacyCreation, GameDriver(FixedRandom()))
     val game =
         service.create(
             names = List(humans) { "Human ${it + 1}" },
             bots =
                 List(bots) { index ->
-                    AutomatedPlayerRequest(
-                        "Automated ${index + 1}",
-                        if (index == 0) BotDifficulty.NORMAL else BotDifficulty.HARD,
-                    )
+                    AutomatedPlayerRequest("Automated ${index + 1}")
                 },
             undoPolicy = policy,
         )

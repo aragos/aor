@@ -38,14 +38,26 @@ try {
     await page.send('Page.enable');
     await page.send('Emulation.setDeviceMetricsOverride', {width: 1440, height: 980, deviceScaleFactor: 1, mobile: false});
     await page.send('Page.addScriptToEvaluateOnNewDocument', {source: `
-        window.botWorkerInputs = [];
-        window.holdBotComputation = false;
+        window.botWorkerStarts = 0;
+        window.botRequests = [];
+        window.holdBotRequest = false;
         const OriginalWorker = window.Worker;
         window.Worker = class extends OriginalWorker {
-            postMessage(input, ...args) {
-                window.botWorkerInputs.push(structuredClone(input));
-                if (!window.holdBotComputation) super.postMessage(input, ...args);
+            constructor(...args) {super(...args); window.botWorkerStarts++;}
+        };
+        const originalFetch = window.fetch;
+        window.fetch = async (input, init) => {
+            if (typeof input === 'string' && input.endsWith('/bots/commands')) {
+                window.botRequests.push(JSON.parse(init.body));
+                if (window.holdBotRequest) {
+                    return new Promise((_, reject) => {
+                        const signal = init.signal;
+                        if (signal.aborted) reject(signal.reason);
+                        else signal.addEventListener('abort', () => reject(signal.reason), {once: true});
+                    });
+                }
             }
+            return originalFetch(input, init);
         };
     `});
     await page.send('Page.navigate', {url: web + '/play'});
@@ -54,8 +66,8 @@ try {
     await page.fill('#names', 'Ada');
     await page.click('Add automated opponent');
     await page.click('Add automated opponent');
-    await page.fill('#bot-difficulty-0', 'EASY');
-    await page.fill('#bot-difficulty-1', 'HARD');
+    assert.equal(await page.evaluate(`document.querySelectorAll('.automated-opponents select').length`), 0);
+    assert.match(await page.evaluate(`document.querySelector('.automated-opponents').textContent`), /experimental.*Latest update: aor-hard-/);
     await page.evaluate(`document.querySelector('.creation-settings').open = true`);
     await page.click('Linear game');
     assert.equal(await page.evaluate(`document.querySelector('.automated-opponents').textContent.includes('3 of 6 seats')`), true);
@@ -68,18 +80,19 @@ try {
     await page.send('Page.bringToFront');
     await page.wait(`document.querySelector('#bid')`, 'human capital bid');
     await page.fill('#bid', '7');
-    await waitState(snapshot => snapshot.submitted.length === 2, 'both client workers submit their sealed bids');
+    await waitState(snapshot => snapshot.submitted.length === 2, 'the checked-in server policy submits both sealed bids');
     await page.wait(`document.querySelectorAll('.player-status').length === 2`, 'private submissions appear through ordinary polling');
     assert.equal(await page.evaluate(`document.querySelector('#bid').value`), '7', 'Bot writes and polling preserve the human draft');
     const initial = await state();
     assert.equal(initial.game.players.length, 3);
-    assert.deepEqual(initial.automation.players.map(player => player.difficulty), ['EASY', 'HARD']);
+    assert.deepEqual(initial.automation.players.map(player => player.difficulty), ['HARD', 'HARD']);
     assert.equal(initial.automation.canControl, true);
     assert.equal(initial.game.hand.length, initial.game.players[0].handCount, 'The human snapshot contains only the human hand');
-    const inputs = await page.evaluate('window.botWorkerInputs');
-    assert(inputs.length >= 2, 'Real Kotlin worker chooses moves for both automated seats');
-    assert(inputs.every(input => input.observation.playerId !== initial.viewerId));
-    assert(inputs.every(input => Object.keys(input).sort().join(',') === 'difficulty,id,observation,seed'), 'Workers receive no authorization, other-seat views or transport receipts');
+    assert.equal(await page.evaluate('window.botWorkerStarts'), 0, 'Server-controlled automata do not start a browser worker');
+    const requests = await page.evaluate('window.botRequests');
+    assert(requests.length >= 2);
+    assert(requests.every(request => !('command' in request) && !('observation' in request)),
+        'The client sends only fenced decision requests and receives no private policy inputs');
 
     await click('#tool-tab-configuration');
     await page.click('Pause automated opponents');
@@ -181,17 +194,17 @@ try {
     await page.fill('#bid', '11');
     await page.wait(`document.querySelector('#purchase-preview').textContent.includes('Cash remaining')`, 'live token quote');
     assert.equal(await page.evaluate(`document.querySelector('#bid').value`), '11');
-    const beforeHeld = await page.evaluate('window.botWorkerInputs.length');
-    await page.evaluate('window.holdBotComputation = true');
+    const beforeHeld = await page.evaluate('window.botRequests.length');
+    await page.evaluate('window.holdBotRequest = true');
     await send(`buy-tokens ${tokenStage.legalChoices.bidMax}`);
-    await page.wait(`window.botWorkerInputs.length > ${beforeHeld}`, 'an actual next bot decision is pending in the worker');
+    await page.wait(`window.botRequests.length > ${beforeHeld}`, 'an actual next server decision request is pending');
     const rewound = await send('undo');
     assert.equal(rewound.automation.paused, true, 'History rewind revokes local automation');
     const restored = rewound.revision;
-    await page.evaluate('window.holdBotComputation = false');
+    await page.evaluate('window.holdBotRequest = false');
     await page.wait(`document.querySelector('.bot-controls').textContent.includes('paused')`, 'history pause is visible');
     await pause(1200);
-    assert.equal((await state()).revision, restored, 'Obsolete worker work cannot recreate undone play');
+    assert.equal((await state()).revision, restored, 'Obsolete bot requests cannot recreate undone play');
     await page.click('Resume automated opponents');
     await waitState(snapshot => !snapshot.automation.paused && snapshot.submitted.length === 2, 'resumption computes fresh private submissions');
 
@@ -203,7 +216,7 @@ try {
     await waitState(snapshot => snapshot.status === 'ABANDONED', 'creator consent includes separate bot agreements');
     await page.wait(`document.querySelector('.bot-controls').textContent.includes('ended')`, 'terminal automation status');
     assert.equal(await page.evaluate(`document.querySelector('.bot-controls button') === null`), true, 'Closed games expose no automation mutation');
-    console.log('Local automated opponents passed: creation/difficulties, real worker decisions, private bids, draft preservation, single-tab lease/takeover, setup and token flow, pending-worker rewind, explicit resume, phone layout and final abandonment.');
+    console.log('Local automated opponents passed: Hard creation, server decisions, private bids, draft preservation, single-tab lease/takeover, setup and token flow, pending-request rewind, explicit resume, phone layout and final abandonment.');
 } finally {
     page.ws.close();
     if (second) {second.ws.close(); await fetch(`${cdp}/json/close/${second.target.id}`);}

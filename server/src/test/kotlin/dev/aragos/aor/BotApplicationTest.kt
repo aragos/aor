@@ -23,9 +23,7 @@ class BotApplicationTest {
                 val created =
                     client.post("/api/games") {
                         contentType(ContentType.Application.Json)
-                        setBody(
-                            """{"players":["Alice"],"bots":[{"difficulty":"EASY"},{"difficulty":"NORMAL"}]}"""
-                        )
+                        setBody("""{"players":["Alice"],"bots":[{},{"difficulty":"HARD"}]}""")
                     }
                 val result = json.readTree(created.bodyAsText())
                 val snapshot =
@@ -39,8 +37,10 @@ class BotApplicationTest {
                 assertThat(created.status).isEqualTo(HttpStatusCode.Created)
                 assertThat(result["links"].size()).isEqualTo(1)
                 assertThat(automation["players"].map { it["difficulty"].asText() })
-                    .containsExactly("EASY", "NORMAL")
+                    .containsExactly("HARD", "HARD")
                     .inOrder()
+                assertThat(automation["players"].map { it["policyVersion"].asText() }.distinct())
+                    .containsExactly(HARD_AUTOMATA_VERSION)
                 assertThat(automation.has("runnerId")).isFalse()
                 assertThat(automation["players"].any { it.has("seed") }).isFalse()
             }

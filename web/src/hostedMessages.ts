@@ -52,7 +52,7 @@ export const hostedMessages: Record<string, string> = {
     "hosted.create-a-game": "Create a game",
     "hosted.an-administrator-must-approve-your": "An administrator must approve your account to create games. You can join games created by other players.",
     "hosted.players": "Players",
-    "hosted.choose-36-registered-players-including": "Choose 3–6 registered players, including yourself.",
+    "hosted.choose-players": "Add registered players by handle.",
     "hosted.remove": "Remove",
     "hosted.find-a-player-by-handle": "Find a player by handle",
     "hosted.matching-players": "Matching players",

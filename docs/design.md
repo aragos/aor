@@ -114,24 +114,30 @@ Failed writes consume no progress.
 
 ## Automated seats
 
-New bots are local private-link seats only; hosted creation requires 3–6 registered humans. Existing
-saves retain controllers/endpoints. `BotAutomation.kt` owns metadata and creator-only 30-second fenced
-leases. Human seats alone have memberships/credentials; absent automation metadata means human-only.
-Archives/checkpoints preserve controllers and pending decisions.
+New local and hosted games can include Hard automated seats in their 3–6 seats. Only humans
+receive memberships or private links. Archives and checkpoints preserve controllers and pending
+decisions. Each new seat records its versioned policy in the game document.
 
-The [browser runner](../web/src/ai/botRunner.ts) sends one seat-safe observation at a time to one local
-worker. [Policies](engine.md#opponent-policies) return canonical commands; the server validates,
-persists and supplies actual randomness. Reads never execute bots; search never calls the server.
-Writes atomically check lease epoch, revision, decision and private-submission version; UUID/hash
-receipts prevent duplicate uncertain decisions. Sealed amounts stay private until ordinary reveal.
-Public snapshots exclude runner identity, deadlines, seeds, hands and receipts.
+The [browser runner](../web/src/ai/botRunner.ts) coordinates decisions while the creator has the
+game open. For new seats, a fenced request identifies the decision and the server chooses and
+submits the command from the acting seat's view. Legacy browser seats continue using their saved
+difficulty and a local worker that receives the deciding seat's observation and seed. The server
+validates all commands, records them and supplies actual randomness. Reads never execute bots.
+Writes atomically check lease epoch, revision, decision and private-submission version. UUID/hash
+receipts reconcile retries. The browser receives no private inference inputs for server-controlled
+seats. Sealed amounts stay private until ordinary reveal.
 
-Only the creator hosts/pauses/resumes/takes over. Regular-turn undo/edits retain the runner and explicit
-pause; stale work rejects and refreshes automatically. Other edits/rewinds pause bots and rotate epochs
-until explicit resume. Completion/closure stops bots. Creator abandonment records separate bot consent;
-each human still consents. The host can inspect bot secrets/modify policy; worker isolation protects
-rendering, not secrets. Replay needs neither policy nor model. [Training](contributing.md#opponent-training)
-is independent of production storage and promotes only compatible, evaluated models.
+Only the creator claims, pauses, resumes or takes over the 30-second lease. Regular-turn undo and
+edits retain the runner and its pause state. Other edits and rewinds pause bots and rotate the
+epoch until explicit resume. Completion and closure stop bots. Creator abandonment records
+separate bot consent. Each human still consents.
+
+[HardAutomata.kt](../server/src/main/kotlin/dev/aragos/aor/HardAutomata.kt) binds the published
+checkpoint version to its exact hashed models and player-count settings. The three server resources
+total 304 KiB. Each model is read and compiled on its first automated decision for the applicable
+player count. Replays use recorded commands and outcomes. Older versioned models must remain
+available while saved games reference them. [Training](contributing.md#opponent-training) runs
+independently of production storage.
 
 ## Lifecycle and activity
 
