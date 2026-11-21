@@ -1,56 +1,362 @@
-# Age of Renaissance
+# AoR automata development archive
 
-Complete, replayable three-epoch games for 3–6 players: Kotlin Multiplatform rules, Ktor authority
-and persistence, React table, and local automated opponents.
+This index preserves 356 named research branch tips as of November 21, 2026. Each original revision and its ancestors are reachable from the archive commit. Open a revision to browse its source or download it. The [branch map](refs.tsv) records full Git object IDs.
 
-## Run locally
-
-Use JDK 21 and Node 26 LTS. From the repository root:
-
-```sh
-npm install
-./gradlew :ai:jsBrowserProductionLibraryDistribution
-./gradlew :server:run
-```
-
-In another terminal, `npm start`, then open <http://localhost:5173>. Vite proxies Ktor on
-`127.0.0.1:8080`. The IDE's **web** configuration runs the same npm command.
-File storage defaults to `.aor-data/`; use one server per directory. `AOR_DATA_DIR` selects an
-absolute path; `AOR_HTTP_PORT` changes the port. Keep private player links: lost credentials
-cannot be recovered. Hosted play uses Firebase accounts and PostgreSQL.
-
-The qualified Hard automata profile applies to rules-4 and current rules-5 local games with four seats, the
-Standard map, No Crusades in the initial deal, deck modification and immediate Master Art discard
-enabled, and draw-three-keep-two disabled. Current rules-5 games combine the qualified expansion
-model and turn-order token control; older games retain their compatible policy. Keep the creator's
-game tab open. This profile passed
-automated comparisons; its strength against humans still needs playtesting. Other setups use compatible fallback policies pending separate qualification. After updating the
-application, restart the local server and reload the creator's tab.
-
-## Find the owner
-
-Read only the guide relevant to the change; detailed rules and syntax are lookup references.
-
-| Area | Code | Guide |
-| --- | --- | --- |
-| Setup, checks, training | Build files, `scripts/` | [Contributing](docs/contributing.md) |
-| Rules, replay, catalogs (JVM/JS) | `core/` | [Engine](docs/engine.md), [rules](docs/rules.md), [commands](docs/commands.md) |
-| Authority, privacy, storage, history | `server/` | [Architecture](docs/design.md) |
-| Table and map | `web/` | [UI](docs/ui-design.md), [maps](docs/map-design.md) |
-| Opponent policies / offline simulation | `ai/`, `training/` | [Engine](docs/engine.md#opponent-policies), [training](docs/contributing.md#opponent-training), [unattended campaigns](docs/contributing.md#unattended-automata-campaigns) |
-| Hosting, release, recovery | `deployment/`, `render.yaml` | [Deployment](docs/deployment.md) |
-| Goals / outstanding work | | [Scope](docs/requirements.md), [follow-ups](docs/follow-ups.md) |
-
-[AGENTS.md](AGENTS.md) owns repository conventions. For quick feedback:
-
-```sh
-npm test --workspace web
-./gradlew :core:jvmTest :server:fastTest checkKotlinFormat
-```
-
-Offline training runs independently of the server and coding agents; see the
-[training workflow](docs/contributing.md#opponent-training) for building and supervising a run.
-Use [full-game strategy experiments](docs/contributing.md#full-game-strategy-experiments) to compare
-frozen candidates against mixed opponents, and the
-[commodity pilot](docs/contributing.md#automata-experiments) for focused continuation diagnostics.
-Experimental outputs require independent qualification before application adoption.
+| Local branch | Source revision |
+| --- | --- |
+| `checkpoint/automata-before-main-20261110` | [02b8df3b73d0](https://github.com/aragos/aor/tree/02b8df3b73d01c4879bcbbdcdbb911f57ba90bee) |
+| `diagnostic/automata-native95-linux-parity` | [5712048e5186](https://github.com/aragos/aor/tree/5712048e51869cd93129ed277cc39ef866c9011f) |
+| `diagnostic/automata-token-plateau` | [5bfdf34eb671](https://github.com/aragos/aor/tree/5bfdf34eb6716a1aa608542037ca8d23fb1065d3) |
+| `docs/automata-card-sequence-training` | [ef658f7a4706](https://github.com/aragos/aor/tree/ef658f7a470691dfa5a18538e6c4fcc519672f3b) |
+| `docs/automata-next-12h` | [d156ed0fb380](https://github.com/aragos/aor/tree/d156ed0fb380c60cea5b0ec55102e97b72bd5361) |
+| `docs/unattended-automata-campaign` | [b1b6781c7b70](https://github.com/aragos/aor/tree/b1b6781c7b70bb0929c59305378a24d010715bb0) |
+| `feat/automata-acquisition-broad-value` | [18bad0283da7](https://github.com/aragos/aor/tree/18bad0283da75fffe39f8ebb481cc34c0cb44435) |
+| `feat/automata-acquisition-conditional-value` | [2c94b6cf82ba](https://github.com/aragos/aor/tree/2c94b6cf82ba20dd3c2b9a146fd21e179b7f42ea) |
+| `feat/automata-acquisition-data-pilot` | [f67596b2bf96](https://github.com/aragos/aor/tree/f67596b2bf9619566d6f083a6ecad17ea9db4a24) |
+| `feat/automata-acquisition-rival-coverage` | [40206500cea1](https://github.com/aragos/aor/tree/40206500cea16d09405b6a379aec780c0aff164b) |
+| `feat/automata-adaptive-initiative` | [e27e256730d7](https://github.com/aragos/aor/tree/e27e256730d7e24f189fc1b17204b8a7fec0ce2b) |
+| `feat/automata-adaptive-token-campaign` | [c95be636fd99](https://github.com/aragos/aor/tree/c95be636fd998dadb7db089df42aa15d266089b2) |
+| `feat/automata-adaptive-token-opponents` | [421412522c0a](https://github.com/aragos/aor/tree/421412522c0abc3af34703411f9f02db4348c2c7) |
+| `feat/automata-adjustment-alias-audit` | [dd079546b3e6](https://github.com/aragos/aor/tree/dd079546b3e64030094dbef9c366a3603fd14f57) |
+| `feat/automata-adopting-targeting-preview` | [dd7590eb8ed8](https://github.com/aragos/aor/tree/dd7590eb8ed844d04407aa0731e52dc5742a6329) |
+| `feat/automata-adversarial-bid-lookahead` | [6bc99caa6090](https://github.com/aragos/aor/tree/6bc99caa6090eac0d50fa258ca838544962bc8be) |
+| `feat/automata-afterstate-critic` | [eefad4b4c66c](https://github.com/aragos/aor/tree/eefad4b4c66ce7724938b2c935803437a0398ee6) |
+| `feat/automata-all-variant-preview` | [155e1928b96f](https://github.com/aragos/aor/tree/155e1928b96fb51fee07e9aa0be995a353c2463d) |
+| `feat/automata-alternating-bid-preview` | [ad4905e5a61a](https://github.com/aragos/aor/tree/ad4905e5a61a76330e6f697549ab284f6f772d65) |
+| `feat/automata-alternating-bid-rivals` | [9e5bbf892c0a](https://github.com/aragos/aor/tree/9e5bbf892c0aa71493ae6fbfedaa9369901cb29a) |
+| `feat/automata-auction-economy` | [3a225469d7ec](https://github.com/aragos/aor/tree/3a225469d7ec23927dfac68db9c16141f42fc10f) |
+| `feat/automata-auction-guarded-opening` | [0062c85e88fc](https://github.com/aragos/aor/tree/0062c85e88fc6258aae766f744d6d85e66b73da1) |
+| `feat/automata-batch-executor` | [988e64126ae2](https://github.com/aragos/aor/tree/988e64126ae218dfdae23d8fd65f636b3f634207) |
+| `feat/automata-batched-campaign` | [4a639a0376a1](https://github.com/aragos/aor/tree/4a639a0376a13feb496b94d287b71b5377afc8d3) |
+| `feat/automata-bid-exploitability` | [f764e3556447](https://github.com/aragos/aor/tree/f764e3556447e1515560fccc2fae4c4c7f16ae4b) |
+| `feat/automata-bid-policy-interaction` | [585aaa3184f6](https://github.com/aragos/aor/tree/585aaa3184f69f46fd48af3b1d1d8c4fb502e2ad) |
+| `feat/automata-broad-native-preview` | [d8fe74e35314](https://github.com/aragos/aor/tree/d8fe74e353146d170975a9aeea1fa440d9086146) |
+| `feat/automata-cancellation-conditional-value` | [0ab5359f873b](https://github.com/aragos/aor/tree/0ab5359f873b6969668a0b93ccf465b72b0407bf) |
+| `feat/automata-cancellation-data` | [e93513a13836](https://github.com/aragos/aor/tree/e93513a13836c4206289289f2736ea6d70f4558c) |
+| `feat/automata-cancellation-fixed-test` | [d97dbee461c7](https://github.com/aragos/aor/tree/d97dbee461c7b8a57e651be50082db70e3dcd3a7) |
+| `feat/automata-cancellation-projection` | [2cdf4cf1ed41](https://github.com/aragos/aor/tree/2cdf4cf1ed410ec7ece79f0eb040c2d56af1d4cf) |
+| `feat/automata-cancellation-value-selector` | [0b7663bee5f8](https://github.com/aragos/aor/tree/0b7663bee5f8371ae63c6f7712f56160534bdb95) |
+| `feat/automata-capital-auction` | [30662b296349](https://github.com/aragos/aor/tree/30662b296349c34931029dfbe69e3ececaa1ed3a) |
+| `feat/automata-capital-auction-league` | [8a288d98e54a](https://github.com/aragos/aor/tree/8a288d98e54a39b44e14bd956ae2578ef502ee2e) |
+| `feat/automata-capital-choice-lookahead` | [c32924877e6f](https://github.com/aragos/aor/tree/c32924877e6fbc89814a26b7bcb8f31f9a821974) |
+| `feat/automata-capital-evolved-targeting` | [aa69c8f61f19](https://github.com/aragos/aor/tree/aa69c8f61f199c850e2144656f9fa32e7b1a55d0) |
+| `feat/automata-capital-geography-preview` | [8615e52a1155](https://github.com/aragos/aor/tree/8615e52a115585a306974c874fac613a5000051e) |
+| `feat/automata-caravan-followthrough` | [c2533ed88d22](https://github.com/aragos/aor/tree/c2533ed88d2269dd3500760f19732282d8639fb6) |
+| `feat/automata-caravan-whole-games` | [18b9e89a92db](https://github.com/aragos/aor/tree/18b9e89a92dbdc049e7444be5e94cce0dde821be) |
+| `feat/automata-card-advantage` | [425d3c15a48e](https://github.com/aragos/aor/tree/425d3c15a48ef3917ef70b536c6eddf775954412) |
+| `feat/automata-card-breadth` | [34e3a63fb00a](https://github.com/aragos/aor/tree/34e3a63fb00a8c160a51adea321747ad0c1dc8c5) |
+| `feat/automata-card-compact` | [3a0cf3d36a6c](https://github.com/aragos/aor/tree/3a0cf3d36a6c39b0d87692bb180987f3de5959ab) |
+| `feat/automata-card-continuation-interaction` | [eb736774db03](https://github.com/aragos/aor/tree/eb736774db03a62cabe768ecb9b86f466e29b187) |
+| `feat/automata-card-continuation-learning` | [fa10d2742afd](https://github.com/aragos/aor/tree/fa10d2742afd24dcf534e54bae289546a7450193) |
+| `feat/automata-card-exploration` | [fe0337cd0821](https://github.com/aragos/aor/tree/fe0337cd08210d35c4cc95f292c0f56c3f973f47) |
+| `feat/automata-card-learning` | [46c7cfd662c8](https://github.com/aragos/aor/tree/46c7cfd662c876429e771accc3abb238ea8b6cc2) |
+| `feat/automata-card-linear-value` | [01c0eae79ecf](https://github.com/aragos/aor/tree/01c0eae79ecfa63613901ebe24f7eea220218cfe) |
+| `feat/automata-card-rollout-labels` | [b77379b0abdd](https://github.com/aragos/aor/tree/b77379b0abdd62db97ab322ee8ff46143a435ef8) |
+| `feat/automata-card-spending-fit` | [beb387605ce4](https://github.com/aragos/aor/tree/beb387605ce466eedd4f3662f8204dac2f0e5ab0) |
+| `feat/automata-card-territory-tradeoff` | [ae63309cc5cc](https://github.com/aragos/aor/tree/ae63309cc5cc03232a651e827b2efe5accb824db) |
+| `feat/automata-card-trajectory-signal` | [69153f49a81a](https://github.com/aragos/aor/tree/69153f49a81aea4917a02f05adf3d7ddd76dd803) |
+| `feat/automata-cathedral-aware-targeting` | [95029136a7f1](https://github.com/aragos/aor/tree/95029136a7f1831afeb396a3eeed348614651ec1) |
+| `feat/automata-cathedral-encoding-probe` | [f7364e429792](https://github.com/aragos/aor/tree/f7364e42979223cd190a91e5debeb4609439c8f4) |
+| `feat/automata-cathedral-native-screen-driver` | [1a869fe15d13](https://github.com/aragos/aor/tree/1a869fe15d13552ef1646e22fdc2a7e17533f97d) |
+| `feat/automata-cathedral-public-transition` | [fa3333e3462f](https://github.com/aragos/aor/tree/fa3333e3462f2760285e84d2cffc2017284001ce) |
+| `feat/automata-cathedral-tactical-frontier` | [896ef12e052e](https://github.com/aragos/aor/tree/896ef12e052ee96b0aa21d065bf9c26e27cbde33) |
+| `feat/automata-cathedral-tactical-selector` | [46a2cd8f7728](https://github.com/aragos/aor/tree/46a2cd8f7728d7916034df6bc15a14f9dc20f282) |
+| `feat/automata-checked-prefix` | [6b556ee0d9c8](https://github.com/aragos/aor/tree/6b556ee0d9c84b381ef2757587add82ee1b4f80b) |
+| `feat/automata-combined-bid-study` | [e072ac0b96e5](https://github.com/aragos/aor/tree/e072ac0b96e52abcfd908d497ecdd15fcf853384) |
+| `feat/automata-combined-initiative-rival` | [d22ae4202fca](https://github.com/aragos/aor/tree/d22ae4202fca5cf2cedde0d0a8539c2b78620596) |
+| `feat/automata-commodity-expansion-lookahead` | [f2e66c2c0691](https://github.com/aragos/aor/tree/f2e66c2c06912f8ee3eb598895632da921b669f0) |
+| `feat/automata-commodity-lookahead` | [829a2dde0b8e](https://github.com/aragos/aor/tree/829a2dde0b8e2012b11da801483a981c9ccfc916) |
+| `feat/automata-commodity-timing-challenger` | [0b5961556adc](https://github.com/aragos/aor/tree/0b5961556adca191480087346a8526b9509be9e9) |
+| `feat/automata-continuation-diagnostic` | [ba4a118667ea](https://github.com/aragos/aor/tree/ba4a118667ea73f3a3fb1640605396cd6ef80e0c) |
+| `feat/automata-coordinated-es-calibration-v2` | [78ef30232eec](https://github.com/aragos/aor/tree/78ef30232eecd205ce806a24f95a69719d9f3bc1) |
+| `feat/automata-coordinated-es-fitness-v2` | [afd49eae6755](https://github.com/aragos/aor/tree/afd49eae6755f7e702a688934aab74f2839afd69) |
+| `feat/automata-coordinated-es-qualification` | [fe583534992a](https://github.com/aragos/aor/tree/fe583534992a883d287c8276779fdfe2ecbe7654) |
+| `feat/automata-coordinated-neural-es-campaign` | [b2e3697aac59](https://github.com/aragos/aor/tree/b2e3697aac594afa07c7dc714b6c7631d7d87099) |
+| `feat/automata-coordinated-neural-es-native` | [10a6f4dd6401](https://github.com/aragos/aor/tree/10a6f4dd6401875018559c25271e7804ec1769d0) |
+| `feat/automata-coordinated-neural-es-numeric` | [a636c7c76623](https://github.com/aragos/aor/tree/a636c7c76623dc6cc602622ade3a9ad851cb0182) |
+| `feat/automata-coordinated-policy-factorial` | [1d20ed53ea59](https://github.com/aragos/aor/tree/1d20ed53ea59218719bc0a742d4ee686686730e4) |
+| `feat/automata-coordinated-qualified-preview` | [7a4c2f6d1d1b](https://github.com/aragos/aor/tree/7a4c2f6d1d1b1e2bed98112356944647e772e0c3) |
+| `feat/automata-coordinated-win-continuation` | [ee5a05f53b6e](https://github.com/aragos/aor/tree/ee5a05f53b6e417be209d1442e2f6e3bf6973a3b) |
+| `feat/automata-coordinated-win-native` | [9bd5757c1cda](https://github.com/aragos/aor/tree/9bd5757c1cda623e13e0bf75bb3a481e35e9c366) |
+| `feat/automata-cpe-paired-campaign` | [8b7c6f66305e](https://github.com/aragos/aor/tree/8b7c6f66305e3e4b34e0a704595b7a9da336887d) |
+| `feat/automata-cpe-paired-cuda` | [453442f2d342](https://github.com/aragos/aor/tree/453442f2d342d2a2ff149e5ccd95f4d98f212201) |
+| `feat/automata-cpe-paired-native` | [75863224956b](https://github.com/aragos/aor/tree/75863224956bdfe56e2ebb28acc73ee82b6ac6c6) |
+| `feat/automata-cpe-paired-numeric` | [5ee0b3e518df](https://github.com/aragos/aor/tree/5ee0b3e518df5bdf91e852e5ae25e7125746963f) |
+| `feat/automata-credible-leader-pressure` | [1b1765a83e5d](https://github.com/aragos/aor/tree/1b1765a83e5d0872688cfc2364a5e0a9e7324376) |
+| `feat/automata-current-rules-preview` | [a61f98c84d48](https://github.com/aragos/aor/tree/a61f98c84d4861a8b16044e6ebd49db02df0e3aa) |
+| `feat/automata-diverse-model-tables` | [df6581b7c03d](https://github.com/aragos/aor/tree/df6581b7c03d680389e31389403f549f45cd9b92) |
+| `feat/automata-diverse-table-defense` | [1d6205166f2e](https://github.com/aragos/aor/tree/1d6205166f2e7ff52363e86fe8c277536aaf1dcc) |
+| `feat/automata-early-capital-bids` | [a7cac300ea80](https://github.com/aragos/aor/tree/a7cac300ea80e5a883888658e37be0b41b89959f) |
+| `feat/automata-event-pressure` | [6c33a4c66b90](https://github.com/aragos/aor/tree/6c33a4c66b909578e432458442fcde701c6d0087) |
+| `feat/automata-evidence-retention` | [bf3310bf4741](https://github.com/aragos/aor/tree/bf3310bf4741d8a7844d1f8d293550cd9d7d57ee) |
+| `feat/automata-evolved-rival-table` | [c7d3e27dc64c](https://github.com/aragos/aor/tree/c7d3e27dc64cc72810c0eec20c3228d132180166) |
+| `feat/automata-evolved-targeting-preview` | [ac9ac8ad9290](https://github.com/aragos/aor/tree/ac9ac8ad92909c8258b132ef470412e224564d63) |
+| `feat/automata-expansion-baseline-control` | [8fb46da2c69c](https://github.com/aragos/aor/tree/8fb46da2c69c3bca1b41054086d71d8f593ac023) |
+| `feat/automata-expansion-browser-bridge` | [ad08d0b579c5](https://github.com/aragos/aor/tree/ad08d0b579c5a4c3747f6d50c5adbd2522441dba) |
+| `feat/automata-expansion-card-reserve-lookahead` | [a86890953fd9](https://github.com/aragos/aor/tree/a86890953fd94e640a288fb95d308078390bfbfd) |
+| `feat/automata-expansion-card-rollouts` | [86d63c07bbe7](https://github.com/aragos/aor/tree/86d63c07bbe7f16f03591074cae531ae26cd0cae) |
+| `feat/automata-expansion-cathedral-context` | [3609eea7fca6](https://github.com/aragos/aor/tree/3609eea7fca6e163816cad21597e921940f5de1b) |
+| `feat/automata-expansion-economic-inputs` | [af0a3b925e59](https://github.com/aragos/aor/tree/af0a3b925e597bb444760d732f4c09635f28e5fb) |
+| `feat/automata-expansion-evolution` | [428fcad90db5](https://github.com/aragos/aor/tree/428fcad90db534d0218fb5d10af9ed40ac1a8026) |
+| `feat/automata-expansion-final-screen` | [8d92856c86a5](https://github.com/aragos/aor/tree/8d92856c86a587f1f3da866a4e669a6adde2b5c3) |
+| `feat/automata-expansion-imitation` | [75ff100b73b6](https://github.com/aragos/aor/tree/75ff100b73b64046baf46a2a29a07dedf41038a1) |
+| `feat/automata-expansion-model-support` | [17e89ece5ea8](https://github.com/aragos/aor/tree/17e89ece5ea8528864cbc1c40d58052fe57db8bc) |
+| `feat/automata-expansion-on-policy` | [98e019ccdf61](https://github.com/aragos/aor/tree/98e019ccdf61b4de209f5e90279356a68b84c56f) |
+| `feat/automata-expansion-opportunity` | [db773e1db6cd](https://github.com/aragos/aor/tree/db773e1db6cdb23b00206778b42e4ec598d5a715) |
+| `feat/automata-expansion-paired-data` | [22fe025236cd](https://github.com/aragos/aor/tree/22fe025236cdeb990773613b9a3acc30be69af46) |
+| `feat/automata-expansion-paired-fit` | [5dd23962b495](https://github.com/aragos/aor/tree/5dd23962b495d027aadb7c610b87939d571a8830) |
+| `feat/automata-expansion-quote-cache` | [baf5b5c57fc0](https://github.com/aragos/aor/tree/baf5b5c57fc08a8d74c765847210eafef7ef4dd4) |
+| `feat/automata-expansion-targets` | [8c4f6253c346](https://github.com/aragos/aor/tree/8c4f6253c3465cfb881ce830ae5c62fc98e7feea) |
+| `feat/automata-expansion-token-preview` | [e3cdc00af749](https://github.com/aragos/aor/tree/e3cdc00af749e2543013d66bcf6580237aebf5c5) |
+| `feat/automata-expected-caravan-routes` | [37241488c9b1](https://github.com/aragos/aor/tree/37241488c9b1e84d665a9fc18bbdfb0f498ff938) |
+| `feat/automata-final-advance-plans` | [41b5fdb3a8b4](https://github.com/aragos/aor/tree/41b5fdb3a8b42b7189ba489009b908e2e2176385) |
+| `feat/automata-final-advance-preview` | [ac9ac8ad9290](https://github.com/aragos/aor/tree/ac9ac8ad92909c8258b132ef470412e224564d63) |
+| `feat/automata-final-expansion` | [384399ad6602](https://github.com/aragos/aor/tree/384399ad66020644b865b81e6486d54021176d61) |
+| `feat/automata-final-leader-protection` | [3645d45edb63](https://github.com/aragos/aor/tree/3645d45edb63a75fadc5be33b89110da3d1eb147) |
+| `feat/automata-fitted-opening-preview` | [ccccc683a266](https://github.com/aragos/aor/tree/ccccc683a26655656e5c70c57fc232f12cc8a5b1) |
+| `feat/automata-fixed-qualification-runner` | [4578c997f0e4](https://github.com/aragos/aor/tree/4578c997f0e41b61ad4f7693b71154ff2f581bf7) |
+| `feat/automata-forecast-retargeting` | [d4f55b569858](https://github.com/aragos/aor/tree/d4f55b569858ea31ff25c66c2495c63eb18c128a) |
+| `feat/automata-frontier-defense` | [a7235699ba68](https://github.com/aragos/aor/tree/a7235699ba68f87ad86a05934aec5be0d71eb6d5) |
+| `feat/automata-full-game-search` | [1d4cc3c54086](https://github.com/aragos/aor/tree/1d4cc3c5408647340a99d12e909345b7d60b43bc) |
+| `feat/automata-full-variant-training` | [397b567d36c4](https://github.com/aragos/aor/tree/397b567d36c4317cd5f0bf2aef20b89d0b7890e2) |
+| `feat/automata-g3-support-preview` | [df530fd6e7e2](https://github.com/aragos/aor/tree/df530fd6e7e2d1575f1c6797c9a7700740e75c0e) |
+| `feat/automata-g3-support-qol-base` | [54e96b201dfe](https://github.com/aragos/aor/tree/54e96b201dfec54cff725e4b8e911f73d8f8ec25) |
+| `feat/automata-generic-qualified-preview` | [0a22d3c073bd](https://github.com/aragos/aor/tree/0a22d3c073bdd805ac6b3d95eb4394327a1a6a75) |
+| `feat/automata-generic-win-qualification` | [dfe4ca4910da](https://github.com/aragos/aor/tree/dfe4ca4910dab447e07b93c0906ba330a663f0fa) |
+| `feat/automata-guarded-finish-preview` | [522482e08602](https://github.com/aragos/aor/tree/522482e08602ecad0d2698482f1438b7d57db215) |
+| `feat/automata-guarded-finishes` | [ea516b58d6cd](https://github.com/aragos/aor/tree/ea516b58d6cddd41d7efade8d6b0abf930223d3d) |
+| `feat/automata-hedged-opening` | [272606dc566d](https://github.com/aragos/aor/tree/272606dc566d53abdf8851b1ad234b82b32d15d7) |
+| `feat/automata-held-commodity-expansion` | [1b02dc895479](https://github.com/aragos/aor/tree/1b02dc8954794be024081c266967dbef04705a37) |
+| `feat/automata-heterogeneous-league` | [4984d3e2e42a](https://github.com/aragos/aor/tree/4984d3e2e42a6c5bc468b6c1b6fcf8eb70fa7b9e) |
+| `feat/automata-human-prefix-diagnostic` | [e40f149ac04f](https://github.com/aragos/aor/tree/e40f149ac04f77202ea3301709d0192a51076ac6) |
+| `feat/automata-immutable-choice-cache` | [e89a8fb88b5a](https://github.com/aragos/aor/tree/e89a8fb88b5ac0ec88e6ae2d86b9f25e2c0a0f02) |
+| `feat/automata-incumbent-corrections` | [bf613b37cf6f](https://github.com/aragos/aor/tree/bf613b37cf6fe17d6f125ba19f473b32ac07080b) |
+| `feat/automata-informed-bid-matrix` | [3c4f5b65ace6](https://github.com/aragos/aor/tree/3c4f5b65ace665b7404ab5dd23806bca4928bc4a) |
+| `feat/automata-initiative` | [d7e5db3a9a9d](https://github.com/aragos/aor/tree/d7e5db3a9a9ded4a4fda6815caf56727801fcef6) |
+| `feat/automata-initiative-cards` | [61a0c9ad6ebb](https://github.com/aragos/aor/tree/61a0c9ad6ebb1fdbd347339c9c6cd9ea6bcfafa7) |
+| `feat/automata-initiative-crossplay` | [5d9f13b727fd](https://github.com/aragos/aor/tree/5d9f13b727fd626aca35c214a9c6c71293a7b71a) |
+| `feat/automata-initiative-mirror` | [e9b0c2e8bf86](https://github.com/aragos/aor/tree/e9b0c2e8bf86b4bc767bfba0067571a1153ec885) |
+| `feat/automata-initiative-preview` | [dccc769a9026](https://github.com/aragos/aor/tree/dccc769a9026771af9dd6c399de6151a27112d51) |
+| `feat/automata-initiative-recency` | [506f1dde6cc4](https://github.com/aragos/aor/tree/506f1dde6cc40c337a51a3cc8491efefd2fe7c93) |
+| `feat/automata-joint-arena-roles` | [b01975fc26fc](https://github.com/aragos/aor/tree/b01975fc26fcb70d849c19029aa1ba84c60575a7) |
+| `feat/automata-joint-chrono-continuation` | [2e50140b0a1c](https://github.com/aragos/aor/tree/2e50140b0a1c7ada2e090cedbd29d2e8b9c19ab9) |
+| `feat/automata-joint-chrono-main-refresh` | [5cf835048a3c](https://github.com/aragos/aor/tree/5cf835048a3cd59931b439e0996b3745cd18cb9b) |
+| `feat/automata-joint-chrono-preview` | [331d834a1bc8](https://github.com/aragos/aor/tree/331d834a1bc8f2c52a786622305bcce5c17a9ca0) |
+| `feat/automata-joint-chrono-qualification` | [0e9ce052281e](https://github.com/aragos/aor/tree/0e9ce052281e19016c4d242505b81f9e64637cf3) |
+| `feat/automata-joint-credit-storage` | [d3af90198409](https://github.com/aragos/aor/tree/d3af901984096cad028785a91950f35eb5a3f7a9) |
+| `feat/automata-joint-credit-targets` | [ce5df7419b2e](https://github.com/aragos/aor/tree/ce5df7419b2eae53637520c694a666ea99c75854) |
+| `feat/automata-joint-credit-trial` | [03e2bf91b7de](https://github.com/aragos/aor/tree/03e2bf91b7dec85261b455ee20288348910bd366) |
+| `feat/automata-joint-current-ecology-reader` | [3b0f93a48660](https://github.com/aragos/aor/tree/3b0f93a486600c2668b1afcc07c40275d888f070) |
+| `feat/automata-joint-economy-search` | [43d82ba38dba](https://github.com/aragos/aor/tree/43d82ba38dbae6926e942f3c16d0656b6e68e6ed) |
+| `feat/automata-joint-expansion-evolution` | [ecd6f8e60d82](https://github.com/aragos/aor/tree/ecd6f8e60d8289fcff679bc6e45511300c41cbbf) |
+| `feat/automata-joint-local-step` | [e6e362032eae](https://github.com/aragos/aor/tree/e6e362032eae6e5944871f9073af5bff36c9d924) |
+| `feat/automata-joint-phase-actor-only` | [380e5f5857ef](https://github.com/aragos/aor/tree/380e5f5857ef073a437605fa63d77ebf428bf94c) |
+| `feat/automata-joint-state-data` | [ebeb92669600](https://github.com/aragos/aor/tree/ebeb92669600a0e510ad851369eff24713b60978) |
+| `feat/automata-joint-state-predictor` | [6a180676cd02](https://github.com/aragos/aor/tree/6a180676cd027431d45bd632ba2d22ac80660fda) |
+| `feat/automata-joint-state-prerequisite` | [75c618be9757](https://github.com/aragos/aor/tree/75c618be97573300cf2abb06e8de497a04c92139) |
+| `feat/automata-joint-state-value-benchmark` | [fe4143ad656c](https://github.com/aragos/aor/tree/fe4143ad656c1d0a0319ca228b78941a3bf0294a) |
+| `feat/automata-joint-successor-qualification` | [a3ebe013eaf7](https://github.com/aragos/aor/tree/a3ebe013eaf760b1f2bbc86ba10f784c293d7d7c) |
+| `feat/automata-joint-trajectory` | [18009176a4dd](https://github.com/aragos/aor/tree/18009176a4dd46f3e93af120ca5b245e97359bc9) |
+| `feat/automata-joint-update-performance` | [8505fa826d12](https://github.com/aragos/aor/tree/8505fa826d1232d5f9d0fa5d0eaf9a27c6356e10) |
+| `feat/automata-keyed-chance-diagnostic` | [ebe1d0c842fd](https://github.com/aragos/aor/tree/ebe1d0c842fd7a19bf02c94cc0ec6d5bf4e13cae) |
+| `feat/automata-known-own-chaos-screen` | [3a9a23e67216](https://github.com/aragos/aor/tree/3a9a23e6721649f5306bbf2c3954fb5ec93f0bfa) |
+| `feat/automata-known-own-chaos-support` | [8f7381f06dd4](https://github.com/aragos/aor/tree/8f7381f06dd4b7e0ee64d97763b6e4033aa2eea6) |
+| `feat/automata-late-card-lookahead` | [4452501e63b4](https://github.com/aragos/aor/tree/4452501e63b4e628ea713d0263716d06fd1ffbfb) |
+| `feat/automata-leader-audit` | [df45ab11a361](https://github.com/aragos/aor/tree/df45ab11a36149258f09531e5a68b6f43a23d06d) |
+| `feat/automata-leader-coordination-diagnostic` | [680fa81a25b4](https://github.com/aragos/aor/tree/680fa81a25b4a201900b39ee8d9d69adaa8decbf) |
+| `feat/automata-leader-denial` | [326da2e80a49](https://github.com/aragos/aor/tree/326da2e80a49c9043e126635b38e3a9d55d7368b) |
+| `feat/automata-leader-denial-audit` | [072913ac436a](https://github.com/aragos/aor/tree/072913ac436ab8f055bbcd5f68eb142bdf56eec3) |
+| `feat/automata-leader-denial-runner` | [95b1e0fa670a](https://github.com/aragos/aor/tree/95b1e0fa670aaa099fb20be9f5a61ed3570fe8e7) |
+| `feat/automata-leader-hold-diagnostic` | [2f009ac695ae](https://github.com/aragos/aor/tree/2f009ac695ae3f68900c938d0bb464434469f931) |
+| `feat/automata-leader-protection-lookahead` | [97eae400c233](https://github.com/aragos/aor/tree/97eae400c23379be4a94f52b0712c7d0349cd535) |
+| `feat/automata-learned-bid-search` | [69166f13bff4](https://github.com/aragos/aor/tree/69166f13bff4af4e73ec061f1d7a4f0a21fac1f9) |
+| `feat/automata-learned-rival-forecast` | [792e78a7e89c](https://github.com/aragos/aor/tree/792e78a7e89c2c4df7ac0cb3311d231f9e322fc9) |
+| `feat/automata-local-bid-mixture` | [ba483f5343cc](https://github.com/aragos/aor/tree/ba483f5343cc664585dbd5daa52b0376cf25e4de) |
+| `feat/automata-local-bid-mixture-runner` | [05d5d89c2b4c](https://github.com/aragos/aor/tree/05d5d89c2b4c6950710c42ae227a3e0994114534) |
+| `feat/automata-local-bid-preview` | [2d43ee9ddbce](https://github.com/aragos/aor/tree/2d43ee9ddbce722eb24f6522445aa8c1e88b9934) |
+| `feat/automata-local-bid-seeds` | [562ae0e1fdf7](https://github.com/aragos/aor/tree/562ae0e1fdf7346d29427972cc21db9f44dc89d1) |
+| `feat/automata-local-initiative` | [1c034357a61a](https://github.com/aragos/aor/tree/1c034357a61a41169d4eb9178ee1dc28fe36e734) |
+| `feat/automata-lookahead-distillation` | [4801dbfed512](https://github.com/aragos/aor/tree/4801dbfed5124a20bb1aba24120197a611bc0d6c) |
+| `feat/automata-mac-leader-search` | [b374f3cd9385](https://github.com/aragos/aor/tree/b374f3cd9385bee5acc55a79e0999e7a1d910a8d) |
+| `feat/automata-mac-qualification-runner` | [a3590d5ac0f1](https://github.com/aragos/aor/tree/a3590d5ac0f15464600ec9a05dfdee49801d23ee) |
+| `feat/automata-mac-qualification-seeds` | [fdc3a27e4bb8](https://github.com/aragos/aor/tree/fdc3a27e4bb833f7834cca6e1814fca25c016c34) |
+| `feat/automata-mac-qualified-preview` | [b1e9eaab081e](https://github.com/aragos/aor/tree/b1e9eaab081e0d228ed5a40f6430253abdfeab53) |
+| `feat/automata-mac-research-activity` | [c59998b9d001](https://github.com/aragos/aor/tree/c59998b9d0013193c5790bc1c007dc8a94d1a21b) |
+| `feat/automata-mac-small-qualification-seeds` | [b187ea2e00bb](https://github.com/aragos/aor/tree/b187ea2e00bbff9536980a1a38476309663b48c9) |
+| `feat/automata-mac-small-qualified-preview` | [497441e9bcdf](https://github.com/aragos/aor/tree/497441e9bcdfed34dacdbd86e2a51524227f5c00) |
+| `feat/automata-main-integration` | [c806e9df5df1](https://github.com/aragos/aor/tree/c806e9df5df12c9091ebdac6b94361ded37aa8d7) |
+| `feat/automata-midgame-adopting-rivals` | [074821db5bcc](https://github.com/aragos/aor/tree/074821db5bcc4e64cbf8a71057e64c257d3a6fe0) |
+| `feat/automata-midgame-bid-lookahead` | [23d7c4bda75a](https://github.com/aragos/aor/tree/23d7c4bda75a9bb2fa5e0b5c87aeb8532e0b5c7e) |
+| `feat/automata-midgame-bid-mixes` | [098c4ea5b36c](https://github.com/aragos/aor/tree/098c4ea5b36cdd44f6e2bd3eaef2d05778cac70b) |
+| `feat/automata-midgame-bid-order-gates` | [ed789088dc7e](https://github.com/aragos/aor/tree/ed789088dc7e33bb8dbf0a97f1398a006e6dea77) |
+| `feat/automata-midgame-rematch` | [6e95b9e2f92f](https://github.com/aragos/aor/tree/6e95b9e2f92f7598cef67509db2b2f4bf240ef4a) |
+| `feat/automata-midgame-response-surface` | [8fdb7c165172](https://github.com/aragos/aor/tree/8fdb7c165172d63ccb8f104a5ec844f219a2943c) |
+| `feat/automata-military-combination-preview` | [0e003335a518](https://github.com/aragos/aor/tree/0e003335a518b61e0c8cbecbdb03957da00b7967) |
+| `feat/automata-mixed-table-preview` | [cd742643736a](https://github.com/aragos/aor/tree/cd742643736a848a6ae30955cd6fbee47a072a58) |
+| `feat/automata-model-ecology` | [74e9505615da](https://github.com/aragos/aor/tree/74e9505615daa1cc5e4e65697641238b671b54f5) |
+| `feat/automata-multistep-territory-values` | [f7364e429792](https://github.com/aragos/aor/tree/f7364e42979223cd190a91e5debeb4609439c8f4) |
+| `feat/automata-next-turn-bases` | [dcdfa02c06fa](https://github.com/aragos/aor/tree/dcdfa02c06fa6849bcfa4e4347398e49626502ee) |
+| `feat/automata-opening-context` | [a5d2d91f9729](https://github.com/aragos/aor/tree/a5d2d91f97294ff8bc2e00e043e2c3d8cad0f9fc) |
+| `feat/automata-opening-hand-training` | [fa5f6de71f00](https://github.com/aragos/aor/tree/fa5f6de71f002c1c42305a7564fd0350b74fa8b0) |
+| `feat/automata-opening-rematch` | [1c2e9c724bb3](https://github.com/aragos/aor/tree/1c2e9c724bb347a90db0b3b05548c80bd01ae209) |
+| `feat/automata-opening-repair` | [3c0d49949c26](https://github.com/aragos/aor/tree/3c0d49949c263a277e67324fe478e7982d9032f2) |
+| `feat/automata-opening-repair-rematches` | [eddc175eb07c](https://github.com/aragos/aor/tree/eddc175eb07c2820e0403087fa64096d563c0cde) |
+| `feat/automata-opening-strategy` | [ed23a3bdbf25](https://github.com/aragos/aor/tree/ed23a3bdbf2573cf6153192149c1889e87754ed6) |
+| `feat/automata-order-window-coverage` | [e6836410423d](https://github.com/aragos/aor/tree/e6836410423d33f90f287566cdd1234c5f9e7819) |
+| `feat/automata-p48-strategy-preview` | [9b6047d71c31](https://github.com/aragos/aor/tree/9b6047d71c31dd10c7210e85d5e15da2747aadf3) |
+| `feat/automata-paired-chance` | [a1daece97ea0](https://github.com/aragos/aor/tree/a1daece97ea0d1c523a8fca09a010a192966b057) |
+| `feat/automata-payoff-trained-challenger` | [0a5e6b90c108](https://github.com/aragos/aor/tree/0a5e6b90c1082a38497931d5e8260821ae8e4d06) |
+| `feat/automata-peaceful-expansion-alternative` | [248943665dc6](https://github.com/aragos/aor/tree/248943665dc66a40e8294ec2f33d8d63cbb91bed) |
+| `feat/automata-phase-aware-bids` | [b7c96825d482](https://github.com/aragos/aor/tree/b7c96825d48297cc7e5b27517b2a4ef11366ab88) |
+| `feat/automata-phase-aware-turn-order` | [2dd898f9b557](https://github.com/aragos/aor/tree/2dd898f9b55797eed80e2860b3f9a820d929ed98) |
+| `feat/automata-player-count-training` | [7cdb0d37fba6](https://github.com/aragos/aor/tree/7cdb0d37fba6427ea275c7c9ea6657c15df03a0c) |
+| `feat/automata-policy-coupling` | [94cc644e190c](https://github.com/aragos/aor/tree/94cc644e190cb8166fc1a8b85ff2f246a4732394) |
+| `feat/automata-population-robustness` | [c238e2c37a3f](https://github.com/aragos/aor/tree/c238e2c37a3f089b9b94d84bb1043257c66096a9) |
+| `feat/automata-portable-benchmark` | [e3246df42eab](https://github.com/aragos/aor/tree/e3246df42eabe88d73c76d98680dd50e64287813) |
+| `feat/automata-preventive-misery` | [95ca06fb5d96](https://github.com/aragos/aor/tree/95ca06fb5d96026ee30c6077a97ce5002439fc24) |
+| `feat/automata-preview-refined-search-qualification` | [2fae739b8a75](https://github.com/aragos/aor/tree/2fae739b8a75c89789e31442623aa935415415c0) |
+| `feat/automata-preview-search-qualification` | [2bcd63aa2b05](https://github.com/aragos/aor/tree/2bcd63aa2b05f3fa657afc19966699f4435c378a) |
+| `feat/automata-primitive-inference` | [aab206f83c75](https://github.com/aragos/aor/tree/aab206f83c7523a9ad37f94c8101486587722c28) |
+| `feat/automata-priority-baseline` | [ed40cd3042b9](https://github.com/aragos/aor/tree/ed40cd3042b934bcac576d7688cd322d17da524d) |
+| `feat/automata-public-threat-gpu` | [33e9e6c3682b](https://github.com/aragos/aor/tree/33e9e6c3682b79a050559234864e5eec25f1b272) |
+| `feat/automata-public-threat-model` | [7f5e0c1bb890](https://github.com/aragos/aor/tree/7f5e0c1bb89003a8af8ff03e2b9dac0af94790f9) |
+| `feat/automata-purchase-baseline-pilot` | [ee1f5011154a](https://github.com/aragos/aor/tree/ee1f5011154ace57ff6f5519e3e07756883f4e0d) |
+| `feat/automata-purchase-boundary-diagnostic` | [baa6e62107a5](https://github.com/aragos/aor/tree/baa6e62107a5adf5af69c329588d13e679983bd5) |
+| `feat/automata-purchase-continuation` | [bad819172fbe](https://github.com/aragos/aor/tree/bad819172fbe837576b3453dd80f11c938accf5e) |
+| `feat/automata-purchase-critic-refresh` | [9fb66e1a83ae](https://github.com/aragos/aor/tree/9fb66e1a83ae0590d03d35934429728f2bab51e0) |
+| `feat/automata-purchase-ecology` | [1b1b1c6cf2bc](https://github.com/aragos/aor/tree/1b1b1c6cf2bc3c94258a4078d9d3bfeaa5361ca1) |
+| `feat/automata-purchase-ecology-campaign` | [d7343ae12364](https://github.com/aragos/aor/tree/d7343ae12364da47f53933c1d55f6fa04c080a08) |
+| `feat/automata-purchase-fast-learning` | [c4239ee8cdcb](https://github.com/aragos/aor/tree/c4239ee8cdcbb285e8025f1dcd475722d3068497) |
+| `feat/automata-purchase-final64-preview` | [90755e913d28](https://github.com/aragos/aor/tree/90755e913d28319fc698ed1bcbe650342171e19e) |
+| `feat/automata-purchase-gae-learning-curve` | [f092c1d9c4bf](https://github.com/aragos/aor/tree/f092c1d9c4bf190811a6bb6019f6554c2a24b7f3) |
+| `feat/automata-purchase-gae-pilot` | [dd00f7cc627a](https://github.com/aragos/aor/tree/dd00f7cc627a75112b6c92d1efd9694f554e93c7) |
+| `feat/automata-purchase-gae-preview` | [b19a825d1e84](https://github.com/aragos/aor/tree/b19a825d1e84db033ff44bab334b64dc2ecd4b81) |
+| `feat/automata-purchase-gae-qualification` | [e508fc7430ec](https://github.com/aragos/aor/tree/e508fc7430ec151d4723956be541b6a56422fb0b) |
+| `feat/automata-purchase-generations` | [d1145b240599](https://github.com/aragos/aor/tree/d1145b240599212b36934dc05d0e9833c264893b) |
+| `feat/automata-purchase-learning` | [c5306c25e99b](https://github.com/aragos/aor/tree/c5306c25e99bd4c91271afecf070d143f28303a0) |
+| `feat/automata-purchase-macro-student` | [52c8b82eeefb](https://github.com/aragos/aor/tree/52c8b82eeefbfa4df7be5a232fe041b9e09b5a3a) |
+| `feat/automata-purchase-mode-decoding` | [9c15e3de8d1b](https://github.com/aragos/aor/tree/9c15e3de8d1b3096c8738ec32bb7d8206a801f45) |
+| `feat/automata-purchase-plan-difference` | [940889082f54](https://github.com/aragos/aor/tree/940889082f5438c2ffa58d14cddd53da6e1a5b1e) |
+| `feat/automata-purchase-plan-ranking` | [96c5edcf3c93](https://github.com/aragos/aor/tree/96c5edcf3c936325f2c4920cf48a7a87de666665) |
+| `feat/automata-purchase-playable` | [a6e516c4a406](https://github.com/aragos/aor/tree/a6e516c4a406b632c065263b297f3219f4784933) |
+| `feat/automata-purchase-preview` | [465b5f22771c](https://github.com/aragos/aor/tree/465b5f22771c6d4a84bc50525fc3a7963e8bf9d0) |
+| `feat/automata-purchase-privileged-extraction` | [a29d2423a16f](https://github.com/aragos/aor/tree/a29d2423a16fd7b666ce57b314d3f59fe5fca87b) |
+| `feat/automata-purchase-sequence-corpus` | [9d6769a9c4dd](https://github.com/aragos/aor/tree/9d6769a9c4ddc004b7e36e5770bf921cd1549252) |
+| `feat/automata-purchase-sequence-teacher` | [dda6846e6037](https://github.com/aragos/aor/tree/dda6846e603758c3f0afcdf323bd5f6265e18886) |
+| `feat/automata-purchase-strong-curriculum` | [6ef9c5e9c07c](https://github.com/aragos/aor/tree/6ef9c5e9c07c3902fd84e77daee52c94f9ecf7ac) |
+| `feat/automata-purchase-strong-qualification` | [80b02cacab8e](https://github.com/aragos/aor/tree/80b02cacab8e61c8107975524f48eee815727459) |
+| `feat/automata-purchase-strong-value` | [72e30a1ac43e](https://github.com/aragos/aor/tree/72e30a1ac43eecd89f186e3bbe3398905159b3bf) |
+| `feat/automata-purchase-supported-improvement` | [2bfdbbe08db5](https://github.com/aragos/aor/tree/2bfdbbe08db5a6b01700c222a20bce9d2b14a165) |
+| `feat/automata-purchase-value-benchmark` | [8cda644191c0](https://github.com/aragos/aor/tree/8cda644191c05893099cd7d737d7b179108d92c7) |
+| `feat/automata-qualified-preview` | [df45ab11a361](https://github.com/aragos/aor/tree/df45ab11a36149258f09531e5a68b6f43a23d06d) |
+| `feat/automata-qualified-preview-finalization` | [eeac2f91ff54](https://github.com/aragos/aor/tree/eeac2f91ff54b830b36685e9523fa91a2d5a4532) |
+| `feat/automata-qualified-token-control` | [fd669513729c](https://github.com/aragos/aor/tree/fd669513729caed83178fdba0b39ef184b6159da) |
+| `feat/automata-qualified94-preview` | [e3c04c8f3672](https://github.com/aragos/aor/tree/e3c04c8f3672ac29d3d34bc848aa74731969657c) |
+| `feat/automata-relief-unlock-lookahead` | [0d8227386289](https://github.com/aragos/aor/tree/0d822738628988bb0ed82b9247a62afee2b2c39f) |
+| `feat/automata-renaissance-phase-data` | [fe26e2209c6b](https://github.com/aragos/aor/tree/fe26e2209c6ba2577bbc041446da6d73cd7f9c97) |
+| `feat/automata-repeated-bid-preview` | [db32301f6a34](https://github.com/aragos/aor/tree/db32301f6a340471f71c47a288100b8fd7cd4f87) |
+| `feat/automata-repeated-undercut-response` | [759586adc808](https://github.com/aragos/aor/tree/759586adc808e225b774db417d354a57cc1b06a0) |
+| `feat/automata-resampled-draw-lookahead` | [33d1e45093ad](https://github.com/aragos/aor/tree/33d1e45093ad15d291946c4a153df7277eb386eb) |
+| `feat/automata-retargeting-adversarial-test` | [7af3a73cd97a](https://github.com/aragos/aor/tree/7af3a73cd97a855489e7a2db06f253aa350e88a1) |
+| `feat/automata-retargeting-coevolution` | [f42d374fd67e](https://github.com/aragos/aor/tree/f42d374fd67e0c1d679c678c4d036e813062fc7a) |
+| `feat/automata-retargeting-mirror` | [f851dcbad502](https://github.com/aragos/aor/tree/f851dcbad5024c5f2d3eb4bd9f7f930beb37aa9f) |
+| `feat/automata-retargeting-preview` | [d54b59c595cd](https://github.com/aragos/aor/tree/d54b59c595cd4ce37bc3ea9581db72afd1e0c59c) |
+| `feat/automata-revealed-counter-response` | [04e23339464e](https://github.com/aragos/aor/tree/04e23339464ecaadc7163a3a82d035a03add45e4) |
+| `feat/automata-rival-denial-lookahead` | [554f62942b6b](https://github.com/aragos/aor/tree/554f62942b6b73bedaa204a4f877013f24d452d7) |
+| `feat/automata-robust-league` | [7168f2df4f25](https://github.com/aragos/aor/tree/7168f2df4f25c14e1b27461df97d7ddfa720f353) |
+| `feat/automata-robust-league-numeric` | [9547cb133d4b](https://github.com/aragos/aor/tree/9547cb133d4b9edd2cef8971325fb767757711ce) |
+| `feat/automata-robust-league-runner` | [49f5ba039c9d](https://github.com/aragos/aor/tree/49f5ba039c9db28c296d213124fdcb9acc33b3fc) |
+| `feat/automata-robust-league-six-numeric` | [2f330077a281](https://github.com/aragos/aor/tree/2f330077a28141dd93aa873f0a7fdb2725be6976) |
+| `feat/automata-robust-qualified-preview` | [a76a2073f364](https://github.com/aragos/aor/tree/a76a2073f364279b6b15a72d9b1d8aadd566c407) |
+| `feat/automata-robust-token-policy` | [62077ff6e1d6](https://github.com/aragos/aor/tree/62077ff6e1d652f44a5c9710b120b7dcdb883778) |
+| `feat/automata-robust-token-runner` | [a2504a83fd1b](https://github.com/aragos/aor/tree/a2504a83fd1baade451ac90115ac0e1b106d6d6b) |
+| `feat/automata-route-allocation` | [8ade421d6e75](https://github.com/aragos/aor/tree/8ade421d6e750b412ace2c39ff07c93cfc14bf04) |
+| `feat/automata-science-survival` | [01b0cb84bb45](https://github.com/aragos/aor/tree/01b0cb84bb45f7d44da33e76db3d2f4abd2260d0) |
+| `feat/automata-search-resource-refinement` | [fffcc5be9a61](https://github.com/aragos/aor/tree/fffcc5be9a614dbf0ac7b58604013da2e512e25e) |
+| `feat/automata-second-capital-confirmation` | [7fa2ec267820](https://github.com/aragos/aor/tree/7fa2ec267820cbae058d1963364718a12874e9e1) |
+| `feat/automata-second-capital-geography` | [6a695614b579](https://github.com/aragos/aor/tree/6a695614b5793bdb838c20872912e1e827ae6f1f) |
+| `feat/automata-series-learning-rivals` | [8e9da62c49b4](https://github.com/aragos/aor/tree/8e9da62c49b4d6c11888c6aa59b134bc2498d7e5) |
+| `feat/automata-short-lookahead` | [12faabccfe09](https://github.com/aragos/aor/tree/12faabccfe095673060d4f2b1118cdbfaa6edbb6) |
+| `feat/automata-stabilization-lookahead` | [86202e008d54](https://github.com/aragos/aor/tree/86202e008d54dfba611d7196d7d894a4e5c2717a) |
+| `feat/automata-static-galley-routes` | [51ddec312f76](https://github.com/aragos/aor/tree/51ddec312f766bfd3d10755d004d7b8672f9177c) |
+| `feat/automata-table-bid-adoption` | [9642141922e6](https://github.com/aragos/aor/tree/9642141922e64c12538ea38bb6e34ed5bb2e8b2b) |
+| `feat/automata-target-evolution` | [fc6d8371e513](https://github.com/aragos/aor/tree/fc6d8371e5134fbf01a0097b0a969fd2f5c37d42) |
+| `feat/automata-targeting-evolution` | [7160d3c672a5](https://github.com/aragos/aor/tree/7160d3c672a5e73566d432018b020145798f8c2b) |
+| `feat/automata-territory-action-values` | [da6ac700f62b](https://github.com/aragos/aor/tree/da6ac700f62b879e8ebbdd00e923251a81221445) |
+| `feat/automata-territory-actors` | [78b4c00ad2c1](https://github.com/aragos/aor/tree/78b4c00ad2c15f3ae09e1e15475f8743cbf59df8) |
+| `feat/automata-territory-replay-performance` | [26c4e5cc297d](https://github.com/aragos/aor/tree/26c4e5cc297d7f36528075cebbb75e90b02a0b46) |
+| `feat/automata-territory-return-experiment` | [2ce395fa5421](https://github.com/aragos/aor/tree/2ce395fa5421f98eef78e952fa710f62c10ad877) |
+| `feat/automata-territory-terminal-values` | [592d2d1fddf6](https://github.com/aragos/aor/tree/592d2d1fddf68eb84e13867bb2c78ad4047db2bc) |
+| `feat/automata-three-player-preview` | [015d6cb6db69](https://github.com/aragos/aor/tree/015d6cb6db6929c299dee232b6948e5fcdcbbb18) |
+| `feat/automata-tie-value-study` | [039b8fa2a531](https://github.com/aragos/aor/tree/039b8fa2a5318513916ed8e291390702b4d3b08b) |
+| `feat/automata-token-anchor-residual` | [2ac16581eeed](https://github.com/aragos/aor/tree/2ac16581eeed8a5d3ea2a078e2920108d90ca9e2) |
+| `feat/automata-token-eight-tail` | [19dce49e744d](https://github.com/aragos/aor/tree/19dce49e744d53d629265061570c6f823269a0dc) |
+| `feat/automata-token-fixed-reference` | [bcad2077f5f1](https://github.com/aragos/aor/tree/bcad2077f5f1a1c1b4c36531f52b75d7748ca214) |
+| `feat/automata-token-fixed-reference-campaign` | [e665502164b6](https://github.com/aragos/aor/tree/e665502164b679a45dde6490de788e3ca669b403) |
+| `feat/automata-token-fixed-reference-python` | [e0151cef060a](https://github.com/aragos/aor/tree/e0151cef060ac111b9f218e5713a4f4ac0f26b2f) |
+| `feat/automata-token-focus-numeric` | [2d5c738fb1c8](https://github.com/aragos/aor/tree/2d5c738fb1c8a44adc13ce2f4d073f7667e87451) |
+| `feat/automata-token-focus-second-runner` | [375ac3cde984](https://github.com/aragos/aor/tree/375ac3cde984e8586d7eff7355de885748431603) |
+| `feat/automata-token-focus-second-seeds` | [b300cdd200a7](https://github.com/aragos/aor/tree/b300cdd200a7d0f7a8a64866b20da727e60e3b34) |
+| `feat/automata-token-focus-seeds` | [5beb4651cda1](https://github.com/aragos/aor/tree/5beb4651cda12dab59b896e80958a33798e4a181) |
+| `feat/automata-token-focus-stage-spec` | [4739172668fa](https://github.com/aragos/aor/tree/4739172668fa5cd37ddbc54705c5e1ebf45c554c) |
+| `feat/automata-token-focus-step-runner` | [dd671059aa34](https://github.com/aragos/aor/tree/dd671059aa34c0de720377768fc9bc91fe2c5167) |
+| `feat/automata-token-history` | [e80a674f103d](https://github.com/aragos/aor/tree/e80a674f103dc8c619c7c22bf8621d0daadc4d59) |
+| `feat/automata-token-history-fits` | [4073f68cb197](https://github.com/aragos/aor/tree/4073f68cb1977dd137de72f887c31b512437f003) |
+| `feat/automata-token-linear-head` | [8168e010205e](https://github.com/aragos/aor/tree/8168e010205e728c134382ff73b703f5621bf035) |
+| `feat/automata-token-minus-two-diagnostic` | [6cf397c41ffb](https://github.com/aragos/aor/tree/6cf397c41ffbda3ad983786126fe9331a2c0c0e0) |
+| `feat/automata-token-neighbor-supervisor` | [a4280a41fef9](https://github.com/aragos/aor/tree/a4280a41fef9b34adc72c70e9647005fed767b77) |
+| `feat/automata-token-overlay-collection` | [b5bffa3af5b1](https://github.com/aragos/aor/tree/b5bffa3af5b1622e1a7a7e680d4a18160dc02d95) |
+| `feat/automata-token-paired-campaign` | [5a293db01e37](https://github.com/aragos/aor/tree/5a293db01e3731828862852a1ce3511b8db6242d) |
+| `feat/automata-token-paired-native` | [4e6144b56b95](https://github.com/aragos/aor/tree/4e6144b56b950cd9666d39cf78ed82d8efb9595d) |
+| `feat/automata-token-paired-numeric` | [1218400aa271](https://github.com/aragos/aor/tree/1218400aa2712230da70be09205b5fc21d22b582) |
+| `feat/automata-token-reference-neighbors` | [c3d0cbc1d62c](https://github.com/aragos/aor/tree/c3d0cbc1d62cb34904fe9f28e73d1dc28ac285c5) |
+| `feat/automata-token-reference-neighbors-campaign` | [83b3e80bd8da](https://github.com/aragos/aor/tree/83b3e80bd8daa92a3ad26c09ee8038b4e3b04573) |
+| `feat/automata-trigger-ending` | [8fd1da8b09bd](https://github.com/aragos/aor/tree/8fd1da8b09bd93ddc5f98b649264c2e5458ff889) |
+| `feat/automata-triple-mc-learning` | [e076787fbedc](https://github.com/aragos/aor/tree/e076787fbedcbaa159bd8a52d7d3fcae6790442e) |
+| `feat/automata-triple-mc-mac-fallback` | [80a39bcbcb23](https://github.com/aragos/aor/tree/80a39bcbcb23acce48010cc2b16fe26adab4366b) |
+| `feat/automata-triple-mc-matched` | [9d27f80b4d91](https://github.com/aragos/aor/tree/9d27f80b4d917f4fc47c81b50fd19de1afc0ef50) |
+| `feat/automata-turn-order-learning` | [4379654e8bcb](https://github.com/aragos/aor/tree/4379654e8bcb94c3c7ab2b355421e121869decd4) |
+| `feat/automata-unattended-campaign` | [b7ad6ed78a3b](https://github.com/aragos/aor/tree/b7ad6ed78a3b168a8b9df40833d67208ab224334) |
+| `feat/automata-unpredictable-bid-preview` | [7f3098e34d92](https://github.com/aragos/aor/tree/7f3098e34d9228f102c29dd5f09f385a07300f0d) |
+| `feat/automata-variant-finish-transfer` | [44aa0d8708ef](https://github.com/aragos/aor/tree/44aa0d8708ef6e65dc48a2e64f630e4286be2afa) |
+| `feat/automata-variant-initiative-training` | [f9640a95a506](https://github.com/aragos/aor/tree/f9640a95a506c164aa0e4045b9f1effdd7f7eb1e) |
+| `feat/automata-variant-replication` | [015d6cb6db69](https://github.com/aragos/aor/tree/015d6cb6db6929c299dee232b6948e5fcdcbbb18) |
+| `feat/automata-variant-token-lookahead` | [591d6f6b205d](https://github.com/aragos/aor/tree/591d6f6b205d376ec3b3d57f7dbd95eb9aeae0f3) |
+| `feat/automata-warm-anchor-campaign` | [60952af2ea51](https://github.com/aragos/aor/tree/60952af2ea51b737a883132adbb1dd040b070a0e) |
+| `feat/automata-warm-token-proximal` | [d7c80639c975](https://github.com/aragos/aor/tree/d7c80639c9751bfc3cc818e3d955d20471c8b1d1) |
+| `feat/automata-weighted-opening` | [1b5a71da81be](https://github.com/aragos/aor/tree/1b5a71da81bebc9e206afad13cae0dbb755477e2) |
+| `feat/automata-weighted-opening-with-pressure` | [0802db2acf6c](https://github.com/aragos/aor/tree/0802db2acf6c7f94ce462910b657af1c0425b1c4) |
+| `feat/automata-weighted-ridge-owner` | [755012537b6e](https://github.com/aragos/aor/tree/755012537b6ee548bcba23f17563b04dee65a9f0) |
+| `feat/automata-windmill-coverage` | [312233e18d0d](https://github.com/aragos/aor/tree/312233e18d0dffabaa5da28e5f2cd881013d88cc) |
+| `feat/automata-windmill-coverage-corpus` | [02202645d58d](https://github.com/aragos/aor/tree/02202645d58de69b0a7ddc940dd3c6c8e4183061) |
+| `feat/automata-windmill-data` | [6258a43f8795](https://github.com/aragos/aor/tree/6258a43f879579532b1f8b7297c1572e303a3604) |
+| `feat/automata-windmill-student` | [18cee18c1a20](https://github.com/aragos/aor/tree/18cee18c1a20b2db83eb8b5c8c6bed7d122c5468) |
+| `feat/automata-windmill-value-python` | [b854c653818f](https://github.com/aragos/aor/tree/b854c653818fa0c6929170642e26c3dc67d5712f) |
+| `feat/current-rules-automata-playtest` | [b861d70b1d34](https://github.com/aragos/aor/tree/b861d70b1d349b19aff9a3446e60bc3731c6d21f) |
+| `feat/human-terminal-purchase-preview` | [06d267c16a5a](https://github.com/aragos/aor/tree/06d267c16a5a86002b9a31daa68942776c77ce39) |
+| `feat/online-automata` | [df707c554bec](https://github.com/aragos/aor/tree/df707c554becb5aea86fd770312024d47e895b9b) |
+| `feat/token-paired-win-objective` | [390ed69da946](https://github.com/aragos/aor/tree/390ed69da946ec8afe475c590132f966ccf20e3f) |
+| `feature/strategic-opponents` | [795887c57c7b](https://github.com/aragos/aor/tree/795887c57c7b6d16b5a0eb4f2f89fe2c49ead30e) |
+| `fix/automata-black-death-targets` | [4e903a5408e5](https://github.com/aragos/aor/tree/4e903a5408e5a0e7b5677541addf7983ccc9f494) |
+| `fix/automata-strategy-replay-budget` | [e8c0591994ed](https://github.com/aragos/aor/tree/e8c0591994edb02c16afc6fb2373ccdc40c05770) |
+| `perf/automata-caravan-geometry` | [b1b6781c7b70](https://github.com/aragos/aor/tree/b1b6781c7b70bb0929c59305378a24d010715bb0) |
+| `perf/automata-caravan-transit-cache` | [7160d3c672a5](https://github.com/aragos/aor/tree/7160d3c672a5e73566d432018b020145798f8c2b) |
+| `perf/automata-card-context-cache` | [127dbb98bf0d](https://github.com/aragos/aor/tree/127dbb98bf0dced960a2866361384325be14d258) |
+| `perf/automata-card-inventory` | [bac9d4fbeb6f](https://github.com/aragos/aor/tree/bac9d4fbeb6ff944303d9e0f59da428a098aff24) |
+| `perf/automata-catalog-cache` | [ec71574ef48f](https://github.com/aragos/aor/tree/ec71574ef48ffb9394a938d38bbfcb255c4cb2d2) |
+| `perf/automata-compact-controller-view` | [7160d3c672a5](https://github.com/aragos/aor/tree/7160d3c672a5e73566d432018b020145798f8c2b) |
+| `perf/automata-competition-quoting` | [9879f986b846](https://github.com/aragos/aor/tree/9879f986b8461687799eae95385ac78f6d803be8) |
+| `perf/automata-contextual-feature-keys` | [7160d3c672a5](https://github.com/aragos/aor/tree/7160d3c672a5e73566d432018b020145798f8c2b) |
+| `perf/automata-evaluation-batches` | [8f2f86b2cd34](https://github.com/aragos/aor/tree/8f2f86b2cd3462bb7d4c8008494c756405838b03) |
+| `perf/automata-evidence-memory` | [8c19e2f59ae9](https://github.com/aragos/aor/tree/8c19e2f59ae99bcfeaed3fc30b97821898d9980c) |
+| `perf/automata-owned-advances` | [7160d3c672a5](https://github.com/aragos/aor/tree/7160d3c672a5e73566d432018b020145798f8c2b) |
+| `perf/automata-partial-placement-quotes` | [ffb4007769d3](https://github.com/aragos/aor/tree/ffb4007769d380f4ef25980495563d2c6d9ce977) |
+| `perf/automata-placement-assessments` | [565bfea752b4](https://github.com/aragos/aor/tree/565bfea752b489bfa7c96630f90582b91b1c31c2) |
+| `perf/automata-planning-control` | [5431aeb28192](https://github.com/aragos/aor/tree/5431aeb281928136534d31dc6dad4f728d2170b7) |
+| `perf/automata-planning-frontier` | [85763a37ea7c](https://github.com/aragos/aor/tree/85763a37ea7c69e334e7ec38ee3a98882d3dc0ab) |
+| `perf/automata-primitive-sparse-features` | [aa69c8f61f19](https://github.com/aragos/aor/tree/aa69c8f61f199c850e2144656f9fa32e7b1a55d0) |
+| `perf/automata-shared-batch-assets` | [b0133e420026](https://github.com/aragos/aor/tree/b0133e420026f60392fe5f33ba010ec50c4bead6) |
+| `perf/automata-shared-projections` | [cf4395cabb09](https://github.com/aragos/aor/tree/cf4395cabb09dee1f1392b69ac5eefb332482e01) |
+| `perf/automata-shared-seat-summaries` | [7160d3c672a5](https://github.com/aragos/aor/tree/7160d3c672a5e73566d432018b020145798f8c2b) |
+| `verify/automata-engine-merge` | [1afcaaba1cca](https://github.com/aragos/aor/tree/1afcaaba1cca1d965ed92af613d01c382bc91c7e) |
+| `verify/automata-purchase-rivals` | [ca641a43cc45](https://github.com/aragos/aor/tree/ca641a43cc453d14c40667992873d0b9b5e8bb2a) |
