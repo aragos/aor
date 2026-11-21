@@ -2,6 +2,7 @@ package dev.aragos.aor.training
 
 import dev.aragos.aor.DieRoll
 import dev.aragos.aor.Entry
+import dev.aragos.aor.FinalAdvancePlan
 import dev.aragos.aor.GameHeader
 import dev.aragos.aor.GameOutcome
 import dev.aragos.aor.GameState
@@ -15,13 +16,27 @@ import dev.aragos.aor.SystemNeed
 import dev.aragos.aor.TextCodec
 import dev.aragos.aor.ai.BotDifficulty
 import dev.aragos.aor.ai.BotModel
+import dev.aragos.aor.ai.BotObservation
 import dev.aragos.aor.ai.BotObservations
 import dev.aragos.aor.ai.BotPolicy
+import dev.aragos.aor.ai.CheckpointPolicy
+import dev.aragos.aor.ai.PhaseInitiativePolicy
 import java.util.concurrent.CancellationException
 import kotlin.random.Random
 
 /** A simulated policy has the same observation-only access as a browser-hosted opponent. */
-data class Competitor(val model: BotModel, val difficulty: BotDifficulty = BotDifficulty.NORMAL)
+data class Competitor(
+    val model: BotModel,
+    val difficulty: BotDifficulty = BotDifficulty.NORMAL,
+    val checkpoint: CheckpointPolicy? = null,
+)
+
+/** A rollout overrides one observed action and restarts future chance from the paired seed. */
+data class BranchMove(val command: String, val futureSeed: Int)
+
+fun interface RolloutDecision {
+    fun branch(seat: Int, observation: BotObservation, ordinary: String): BranchMove?
+}
 
 /** Public coverage facts; no actual hidden hand or deck order is retained in training reports. */
 data class GameCoverage(
@@ -73,12 +88,14 @@ class Simulation(private val maxDecisions: Int = 12000) {
         competitors: List<Competitor>,
         deadlineNanos: Long = Long.MAX_VALUE,
         verifyReplay: Boolean = false,
+        collectCoverage: Boolean = true,
+        rollout: RolloutDecision? = null,
     ): SimulatedGame {
         require(competitors.size == configuration.playerCount) {
             "Every simulated seat requires one competitor."
         }
         val started = System.nanoTime()
-        val random = Random(seed)
+        var random = Random(seed)
         val entries = if (verifyReplay) mutableListOf<Entry>() else null
         val players =
             (1..configuration.playerCount).map { number ->
@@ -126,20 +143,50 @@ class Simulation(private val maxDecisions: Int = 12000) {
             val actions = actors.map { actor ->
                 val seat = players.indexOfFirst { it.id == actor }
                 val competitor = competitors[seat]
-                val observation = BotObservations.from(state, actor)
-                observation.candidates.flatMapTo(features) { it.features.keys }
-                val candidate =
-                    BotPolicy.chooseCandidate(
-                        observation = observation,
-                        difficulty = competitor.difficulty,
-                        seed = seed xor (step * 65537 + seat * 8191),
-                        model = competitor.model,
+                val view = state.viewForDecision(actor)
+                val choice =
+                    when (prompt) {
+                        is Prompt.SinglePlayer -> prompt.choice
+                        is Prompt.MultiPlayer -> prompt.choice
+                        is Prompt.System -> error("A system request has no deciding seat.")
+                    }
+                val observation =
+                    BotObservations.from(
+                        view,
+                        state.legalChoices(actor),
+                        actor,
+                        choice,
+                        state.header.rulesVersion,
                     )
-                decisions[observation.decision] = (decisions[observation.decision] ?: 0) + 1
-                families[candidate.family] = (families[candidate.family] ?: 0) + 1
-                val action = TextCodec.parseAction(candidate.command, state, actor = actor)
-                if (candidate.command.startsWith("play ")) {
-                    val reference = candidate.command.split(' ').getOrNull(1)
+                val decisionSeed = seed xor (step * 65537 + seat * 8191)
+                val ordinary =
+                    competitor.checkpoint?.choose(
+                        observation,
+                        if (choice == "buy-tokens") PhaseInitiativePolicy.project(view, actor)
+                        else null,
+                        if (choice == "purchase-advances")
+                            FinalAdvancePlan.quote(state, view, actor)
+                        else null,
+                        decisionSeed,
+                    )
+                        ?: BotPolicy.choose(
+                            observation,
+                            competitor.difficulty,
+                            decisionSeed,
+                            competitor.model,
+                        )
+                val branch = rollout?.branch(seat, observation, ordinary)
+                if (branch != null) random = Random(branch.futureSeed)
+                val command = branch?.command ?: ordinary
+                if (collectCoverage) {
+                    observation.candidates.flatMapTo(features) { it.features.keys }
+                    val family = observation.candidates.first { it.command == command }.family
+                    decisions[choice] = (decisions[choice] ?: 0) + 1
+                    families[family] = (families[family] ?: 0) + 1
+                }
+                val action = TextCodec.parseAction(command, state, actor = actor)
+                if (collectCoverage && command.startsWith("play ")) {
+                    val reference = command.split(' ').getOrNull(1)
                     state
                         .playerState(actor)
                         .hand
@@ -162,8 +209,10 @@ class Simulation(private val maxDecisions: Int = 12000) {
                 step++
             }
             state = resolve(state, random, entries)
-            state.players.values.mapNotNullTo(capitals) { it.capital }
-            epochs.add(state.currentEpoch.number)
+            if (collectCoverage) {
+                state.players.values.mapNotNullTo(capitals) { it.capital }
+                epochs.add(state.currentEpoch.number)
+            }
         }
         if (entries != null) {
             val replayed =

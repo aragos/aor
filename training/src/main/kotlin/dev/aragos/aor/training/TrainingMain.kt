@@ -11,6 +11,10 @@ import kotlin.random.Random
 
 /** Resource-bounded, resumable offline training; it never starts a production service. */
 fun main(arguments: Array<String>) {
+    if (arguments.firstOrNull() == "checkpoint-bank") {
+        CheckpointBank.run(arguments.drop(1))
+        return
+    }
     if (arguments.contentEquals(arrayOf("--help"))) {
         println(
             """

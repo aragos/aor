@@ -55,6 +55,9 @@ limit. `AOR_BROWSER_SERVER` reuses an installed executable. For SQL browser chec
 
 ## Opponent training
 
+For the two-machine league with the current browser Hard checkpoint, use the
+[current-rules campaign](automata-campaign.md).
+
 Build once; the complete distribution runs independently with JDK 21+ and Python 3.10+ on macOS/Linux.
 Keep `bin/` and `lib/` together; `:training:distZip` produces a portable zip.
 
