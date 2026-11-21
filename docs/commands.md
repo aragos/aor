@@ -83,11 +83,11 @@ prefix. Every accepted change records its author and parent revision in immutabl
 
 | Command | Behavior |
 | --- | --- |
-| `set-undo-policy <scope>` | Creator before `start`; `competitive`, `regular-turn` (default), `friendly-turn`, or `linear-game` (`friendly-game` is retained for legacy history) |
-| `undo` | Remove the latest complete unit under Linear game; legacy policies retain their outcome constraints |
+| `set-undo-policy <scope>` | Creator before `start`; `competitive`, `regular-turn` (default), `friendly-turn`, or `linear-game` (shown as Friendly game). The `friendly-game` identifier is retained for legacy history. |
+| `undo` | Remove the latest complete unit under Friendly game; legacy policies retain their outcome constraints |
 | `undo <entry-count>` | Retain this many effective engine entries and validate the removed suffix |
 
-Linear game accepts only exact-prefix `undo` / `undo N`; its suffix endpoint rejects even an empty
+Friendly game accepts only exact-prefix `undo` / `undo N`; its suffix endpoint rejects even an empty
 replacement. `GET /api/games/{id}/rewind-targets?expectedRevision=N[&before=K]` returns up to 30 legal
 viewer-safe targets, newest first, with `nextBefore` for pagination. Commands revalidate the exact
 entry count under the write lock. There is no redo.

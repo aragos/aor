@@ -105,19 +105,63 @@ try {
     await page.wait(`!document.querySelector('dialog[open]')`, 'dismiss pass review');
     assert.equal((await game.snapshot(link)).revision, state.revision);
 
-    const drawn = await game.send(link, 'buy-expansion-card');
-    await page.wait(`document.querySelector('#tool-tab-commands small').textContent.endsWith('${drawn.revision}') && document.querySelector('.undo-action:not([disabled])')`, 'linear undo after random draw');
+    const placement = state.legalChoices.commands.find(command => command.startsWith('place 1 '));
+    assert(placement, 'A deterministic placement is available');
+    const placed = await game.send(link, placement);
+    const waitForUndo = async (revision) => page.wait(
+        `document.querySelector('#tool-tab-commands small').textContent.endsWith('${revision}') && document.querySelector('.undo-action:not([disabled])')`,
+        'Undo shows the live revision',
+    );
+    await waitForUndo(placed.revision);
     await page.click('Undo');
-    await page.wait(`document.querySelector('dialog[open]')?.textContent.includes('New rolls and random selections may change')`, 'rewind consequence review');
+    await waitForUndo(placed.revision + 1);
+    assert.equal(await page.evaluate(`!!document.querySelector('dialog[open]')`), false, 'Routine Undo commits in one click');
+    assert.deepEqual((await game.snapshot(link)).game.board, state.game.board);
+
+    const drawn = await game.send(link, 'buy-expansion-card');
+    await waitForUndo(drawn.revision);
+    await page.click('Undo');
+    await page.wait(`document.querySelector('dialog[open]')?.textContent.includes('Draws follow the restored deck')`, 'Short random outcome review');
     assert.equal((await game.snapshot(link)).revision, drawn.revision);
+    await page.click('Undo last action');
+    await waitForUndo(drawn.revision + 1);
+    await page.wait(`!document.querySelector('dialog[open]')`, 'Undo closes the confirmation');
+    assert.deepEqual((await game.snapshot(link)).game.hand, state.game.hand);
+
+    await game.send(link, 'buy-expansion-card');
+    const beforeCheckpoint = await game.send(link, placement);
+    await waitForUndo(beforeCheckpoint.revision);
+    for (const [width, height, mobile] of [[1440, 980, false], [390, 844, true]]) {
+        await page.send('Emulation.setDeviceMetricsOverride', {width, height, deviceScaleFactor: 1, mobile});
+        await page.evaluate(`document.querySelector('.undo-history').focus(); document.activeElement.click()`);
+        await page.wait(`document.querySelectorAll('.rewind-targets button').length > 1`, 'Undo arrow opens the live checkpoints');
+        assert.equal(await page.evaluate(`document.querySelector('.tool-panels').hidden`), true, 'Commands can stay closed');
+        assert.equal(await page.evaluate(`document.querySelector('.rewind-dialog').scrollWidth <= document.querySelector('.rewind-dialog').clientWidth + 1`), true);
+        await page.viewportScreenshot(join(process.env.AOR_BROWSER_ARTIFACTS, mobile ? 'undo-history-phone.png' : 'undo-history.png'));
+        if (!mobile) {
+            await click('.rewind-dialog .close-detail');
+            assert.equal(await page.evaluate(`document.activeElement.matches('.undo-history')`), true, 'Closing history restores focus');
+        }
+    }
+    await click('.rewind-targets li:nth-child(2) button');
+    await page.wait(`document.querySelector('dialog[open] h2').textContent.includes('checkpoint?')`, 'Selecting a checkpoint opens its review');
+    assert.equal((await game.snapshot(link)).revision, beforeCheckpoint.revision, 'Selecting a checkpoint is read-only');
+    const newer = await game.send(link, placement);
+    await page.wait(`document.querySelector('.rewind-dialog .blocker')?.textContent.includes('The game changed')`, 'Checkpoint confirmation becomes stale after polling');
+    assert.equal(await page.evaluate(`[...document.querySelectorAll('.rewind-dialog button')].find(b => b.textContent === 'Rewind to here').disabled`), true);
+    await page.click('Back');
+    await page.wait(`document.querySelectorAll('.rewind-targets button').length > 2`, 'Back loads the current checkpoints');
+    await click('.rewind-targets li:nth-child(3) button');
     await page.click('Rewind to here');
-    await page.wait(`!document.querySelector('dialog[open]')`, 'rewind accepted');
+    await waitForUndo(newer.revision + 1);
     const undone = await game.snapshot(link);
-    assert.equal(undone.revision, drawn.revision + 1);
     assert.deepEqual(undone.game.board, state.game.board);
     assert.deepEqual(undone.game.hand, state.game.hand);
-    assert.equal(await page.evaluate(`document.querySelectorAll('.history-editor').length`), 0, 'Linear games expose no suffix editor');
+    assert.equal(await page.evaluate(`document.querySelectorAll('.history-editor').length`), 0, 'Friendly games expose no suffix editor');
     assert.equal(undone.undo.capability, 'PREFIX_REWIND');
+    await page.send('Emulation.setDeviceMetricsOverride', {width: 1440, height: 980, deviceScaleFactor: 1, mobile: false});
+    await click('#tool-tab-commands');
+    assert.match(await page.evaluate(`document.querySelector('.command-dock p').textContent`), /Friendly game/);
 
     await vote(1, 'propose');
     await vote(0, 'agree');
@@ -128,5 +172,5 @@ try {
     assert.equal(await page.evaluate(`document.querySelectorAll('.final-scores').length`), 0, 'Abandonment does not score the game');
     await page.send('Emulation.setDeviceMetricsOverride', {width: 390, height: 844, deviceScaleFactor: 1, mobile: true});
     await page.viewportScreenshot(join(process.env.AOR_BROWSER_ARTIFACTS, 'unanimously-abandoned-phone.png'));
-    console.log('Live game controls passed: setup tracks, draft-safe consent, advance review, pass confirmation, random rewind, unanimous terminal cleanup.');
+    console.log('Live game controls passed: setup tracks, draft-safe consent, advance review, pass confirmation, one-step Undo, random and stale checkpoint review, unanimous terminal cleanup.');
 } finally {page.ws.close();}
