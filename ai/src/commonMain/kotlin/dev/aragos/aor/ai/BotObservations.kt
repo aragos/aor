@@ -21,6 +21,7 @@ import dev.aragos.aor.ProvinceDefinition
 import dev.aragos.aor.ProvinceId
 import dev.aragos.aor.RULES_VERSION
 import dev.aragos.aor.TokenPurchaseOfferView
+import dev.aragos.aor.TurnCommand
 import kotlin.math.abs
 
 /**
@@ -141,6 +142,8 @@ private class ObservationProjection(
                 "configure" -> listOf("start")
                 "bid-capital" -> (0..40).map { "bid-capital $it" }
                 "buy-tokens" -> view.tokenPurchaseOffers.map { "buy-tokens ${it.amount}" }
+                // Bots can reconsider a swap at each phase using the current board and order.
+                "renaissance" -> choices.commands - TurnCommand.PassRenaissance.toText()
                 else -> choices.commands
             }
         val augmented = commands + expansionCommands() + subsetCommands() + cardCommands()

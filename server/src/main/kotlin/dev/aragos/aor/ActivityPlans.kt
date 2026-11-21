@@ -286,7 +286,10 @@ internal object ActivityPlans {
     ): StoredGame {
         val prompt = before.state().prompts().singleOrNull() as? Prompt.SinglePlayer
         // Renaissance precedes the planned activity; answering it does not replace that intent.
-        val answersRenaissance = command == TurnCommand.Pass || command is TurnCommand.SwapOrder
+        val answersRenaissance =
+            command == TurnCommand.Pass ||
+                command == TurnCommand.PassRenaissance ||
+                command is TurnCommand.SwapOrder
         if (answersRenaissance && prompt?.player == owner && prompt.choice == "renaissance") {
             return reconcile(game)
         }

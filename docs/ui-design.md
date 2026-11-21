@@ -101,8 +101,9 @@ draws/changed consequences pause, editing confirms disarm. [Architecture](design
 Card purchases offer one Buy/Pass choice while waiting, scheduling it directly with cancellation;
 on the player's turn, ordinary Buy/Pass actions commit directly. Existing plans that include discards
 remain reviewable through the full planner. Renaissance decisions allow scheduling card purchases;
-they delay execution without disabling Renaissance. **Keep turn order** resolves Renaissance;
-scheduled card choices say **on my turn** and stay beside their timing explanation during that window.
+they delay execution without disabling Renaissance. **Keep turn order** passes on the current swap
+offer. **Pass for the rest of this turn** also declines the player's later offers that turn.
+Scheduled card choices say **on my turn** and stay beside their timing explanation during that window.
 Planned relief declines remain visible, and active drafts offer an explicit
 Save and execute action.
 

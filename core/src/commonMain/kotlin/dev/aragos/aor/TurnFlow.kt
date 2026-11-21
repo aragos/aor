@@ -64,6 +64,8 @@ data class TurnFlow(
     val discardedCards: Set<PlayerId> = emptySet(),
     val cancelComplete: Boolean = false,
     val renaissanceUsed: Set<PlayerId> = emptySet(),
+    /** Owners who declined any further Renaissance offers in this turn. */
+    val renaissancePassed: Set<PlayerId> = emptySet(),
     val shipped: Map<PlayerId, Map<ProvinceId, Int>> = emptyMap(),
     val expansionCards: Set<PlayerId> = emptySet(),
     val expansionCardCount: Int = 0,
@@ -96,7 +98,8 @@ internal data class RenaissanceDecision(override val player: PlayerId) : TurnDec
         }
 
     override fun choices(state: GameState): List<String> =
-        listOf("pass") + targets(state).map { target -> "swap-order $target" }
+        listOf("pass", TurnCommand.PassRenaissance.toText()) +
+            targets(state).map { TurnCommand.SwapOrder(it).toText() }
 }
 
 internal data object ShortageDecision : TurnDecision.Roll {

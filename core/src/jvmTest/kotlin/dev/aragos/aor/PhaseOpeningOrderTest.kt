@@ -2,6 +2,7 @@ package dev.aragos.aor
 
 import com.google.common.truth.Truth.assertThat
 import kotlin.test.Test
+import kotlin.test.assertFailsWith
 import kotlinx.collections.immutable.persistentListOf
 
 class PhaseOpeningOrderTest {
@@ -120,6 +121,63 @@ class PhaseOpeningOrderTest {
             val opened = game(phase).withAdvances(p1, AdvanceId.RENAISSANCE).normalise()
             assertThat(opened.prompts()).containsExactly(Prompt.SinglePlayer(p1, "renaissance"))
         }
+    }
+
+    @Test
+    fun passingRenaissanceForTheTurnLeavesOtherOwnersEligible() {
+        val pending =
+            game(Stage.PLAY_CARDS)
+                .withAdvances(p1, AdvanceId.RENAISSANCE)
+                .withAdvances(p3, AdvanceId.RENAISSANCE)
+                .normalise()
+
+        val passed = pending.step(TextCodec.parse("p1: pass-renaissance"))
+        val nextPhase = passed.step(TextCodec.parse("p3: pass"))
+
+        assertThat(pending.legalChoices(p1).commands)
+            .containsExactly("pass", "pass-renaissance", "swap-order p2")
+        assertThat(pending.legalChoices(p3).commands).isEmpty()
+        assertThat(passed.prompts()).containsExactly(Prompt.SinglePlayer(p3, "renaissance"))
+        assertThat(nextPhase.stage).isEqualTo(Stage.PURCHASE)
+        assertThat(nextPhase.prompts()).containsExactly(Prompt.SinglePlayer(p3, "renaissance"))
+        assertThat(nextPhase.turnOrder).containsExactly(p1, p2, p3).inOrder()
+    }
+
+    @Test
+    fun passingRenaissanceForTheTurnExpiresAfterIncome() {
+        val pending =
+            game(Stage.EXPANSION)
+                .withAdvances(p1, AdvanceId.RENAISSANCE)
+                .copy(capitalSelection = CapitalSelection(persistentListOf(p1, p2, p3)))
+                .normalise()
+
+        val nextTurn =
+            listOf(
+                    "p1: pass-renaissance",
+                    "p1: pass",
+                    "p2: pass",
+                    "p3: pass",
+                    "!roll shortage 6 6 6",
+                    "!roll shortage 6 6 6",
+                    "p1: buy-tokens 3",
+                    "p2: buy-tokens 2",
+                    "p3: buy-tokens 1",
+                )
+                .fold(pending) { state, command -> state.step(TextCodec.parse(command)) }
+
+        assertThat(nextTurn.turnNumber).isEqualTo(3)
+        assertThat(nextTurn.prompts()).containsExactly(Prompt.SinglePlayer(p1, "renaissance"))
+    }
+
+    @Test
+    fun passingRenaissanceForTheTurnRequiresTheCurrentDecision() {
+        val pending = game(Stage.EXPANSION).withAdvances(p1, AdvanceId.RENAISSANCE).normalise()
+        val passed = pending.step(TextCodec.parse("p1: pass-renaissance"))
+
+        val failure =
+            assertFailsWith<RuleViolation> { passed.step(TextCodec.parse("p1: pass-renaissance")) }
+
+        assertThat(failure.code).isEqualTo(ViolationCode.WRONG_PHASE)
     }
 
     @Test

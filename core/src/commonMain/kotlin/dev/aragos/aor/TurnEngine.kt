@@ -283,7 +283,8 @@ internal object TurnEngine {
                 orderMatters &&
                     state.playerState(id).misery != MiseryStep.CHAOS &&
                     state.playerState(id).advances.owns(AdvanceId.RENAISSANCE) &&
-                    id !in state.flow.renaissanceUsed
+                    id !in state.flow.renaissanceUsed &&
+                    id !in state.flow.renaissancePassed
             }
         // Reversed stack gives the earliest player first opportunity.
         return state.copy(
