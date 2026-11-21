@@ -632,10 +632,7 @@ class CardGameTest {
         val initial =
             running("war")
                 .let { state ->
-                    state
-                        .cardContext()
-                        .provinces
-                        .values
+                    state.cardContext.provinces.values
                         .filter { province ->
                             province.marketNumber > 1 && province.id.value != "tunis"
                         }

@@ -3,11 +3,14 @@ package dev.aragos.aor
 import dev.aragos.aor.ai.BotDifficulty
 import dev.aragos.aor.ai.BotObservation
 import dev.aragos.aor.ai.BotObservations
+import dev.aragos.aor.ai.HARD_AUTOMATA_VERSION
+import dev.aragos.aor.ai.PhaseInitiativeInput
+import dev.aragos.aor.ai.PhaseInitiativePolicy
 import java.security.MessageDigest
 import java.util.UUID
 
 /** A new automated seat; its display name is fixed when the game is created. */
-data class AutomatedPlayerRequest(val name: String, val difficulty: BotDifficulty) {
+data class AutomatedPlayerRequest(val name: String) {
     init {
         require(name.isNotBlank() && name == name.trim() && name.length <= 60) {
             "An automated player requires a trimmed display name of one through 60 characters."
@@ -99,9 +102,12 @@ data class BotDecisionWork(
     val decisionId: String,
     val submissionVersion: String?,
     val observation: BotObservation,
+    val policyVersion: String,
+    val initiative: PhaseInitiativeInput? = null,
+    val finish: FinalAdvanceOffer? = null,
 )
 
-/** Creator-only work; each observation belongs to exactly one automated seat. */
+/** Creator-only work. Each observation belongs only to its acting automated seat. */
 data class BotWork(
     val revision: Int,
     val epoch: Int,
@@ -111,7 +117,7 @@ data class BotWork(
     val operationReceipts: List<String>,
 )
 
-/** Client-computed commands pass through the ordinary authority driver under the game lock. */
+/** Fenced automated decisions use the ordinary authority driver under the game lock. */
 internal object BotAutomation {
     private const val LEASE_MILLIS = 30000L
 
@@ -370,13 +376,27 @@ internal object BotAutomation {
                                 "A ready automated seat requires its controller."
                             }
                         val decision = decisionId(game, seat)
+                        val state = game.state()
+                        val observation = BotObservations.from(state, seat)
+                        val current = bot.policyVersion == HARD_AUTOMATA_VERSION
+                        val initiative =
+                            if (current && observation.decision == "buy-tokens") {
+                                PhaseInitiativePolicy.project(state.viewForDecision(seat), seat)
+                            } else null
+                        val finish =
+                            if (current && observation.decision == "purchase-advances") {
+                                FinalAdvancePlan.quote(state, state.viewForDecision(seat), seat)
+                            } else null
                         BotDecisionWork(
                             seat = seat,
                             difficulty = bot.difficulty,
                             seed = bot.seed xor decision.hashCode(),
                             decisionId = decision,
                             submissionVersion = game.submissionVersions[seat],
-                            observation = BotObservations.from(game.state(), seat),
+                            observation = observation,
+                            policyVersion = bot.policyVersion,
+                            initiative = initiative,
+                            finish = finish,
                         )
                     },
             operationReceipts = runner.receipts.map(BotOperationReceipt::operationId),

@@ -10,7 +10,7 @@ class CommodityPayoutOverflowTest {
     fun nineWoolMarketsWithIndustryAndAShortagePayBeyondThePrintedBoxes() {
         val initial = woolPayoutState()
 
-        val result = CardRules.commodityPayment(initial.cardContext(), Commodity.WOOL)
+        val result = CardRules.commodityPayment(initial.cardContext, Commodity.WOOL)
 
         assertThat(
                 requireNotNull(result.payments[owner]) {

@@ -54,8 +54,9 @@ try {
     await page.fill('#names', 'Ada');
     await page.click('Add automated opponent');
     await page.click('Add automated opponent');
-    await page.fill('#bot-difficulty-0', 'EASY');
-    await page.fill('#bot-difficulty-1', 'HARD');
+    assert.equal(await page.evaluate(`document.querySelectorAll('.automated-opponents select').length`), 0);
+    assert.match(await page.evaluate(`document.querySelector('.automated-opponents').textContent`), /experimental.*Latest update: aor-hard-/);
+    assert.equal(await page.evaluate('window.botWorkerInputs.length'), 0, 'Game setup does not load a model');
     await page.evaluate(`document.querySelector('.creation-settings').open = true`);
     await page.click('Linear game');
     assert.equal(await page.evaluate(`document.querySelector('.automated-opponents').textContent.includes('3 of 6 seats')`), true);
@@ -73,13 +74,14 @@ try {
     assert.equal(await page.evaluate(`document.querySelector('#bid').value`), '7', 'Bot writes and polling preserve the human draft');
     const initial = await state();
     assert.equal(initial.game.players.length, 3);
-    assert.deepEqual(initial.automation.players.map(player => player.difficulty), ['EASY', 'HARD']);
+    assert.deepEqual(initial.automation.players.map(player => player.difficulty), ['HARD', 'HARD']);
     assert.equal(initial.automation.canControl, true);
     assert.equal(initial.game.hand.length, initial.game.players[0].handCount, 'The human snapshot contains only the human hand');
     const inputs = await page.evaluate('window.botWorkerInputs');
     assert(inputs.length >= 2, 'Real Kotlin worker chooses moves for both automated seats');
     assert(inputs.every(input => input.observation.playerId !== initial.viewerId));
-    assert(inputs.every(input => Object.keys(input).sort().join(',') === 'difficulty,id,observation,seed'), 'Workers receive no authorization, other-seat views or transport receipts');
+    assert(inputs.every(input => input.policyVersion === initial.automation.players[0].policyVersion));
+    assert(inputs.every(input => Object.keys(input).sort().join(',') === 'difficulty,finish,id,initiative,observation,policyVersion,seed'), 'Workers receive no authorization, other-seat views or transport receipts');
 
     await click('#tool-tab-configuration');
     await page.click('Pause automated opponents');
@@ -203,7 +205,7 @@ try {
     await waitState(snapshot => snapshot.status === 'ABANDONED', 'creator consent includes separate bot agreements');
     await page.wait(`document.querySelector('.bot-controls').textContent.includes('ended')`, 'terminal automation status');
     assert.equal(await page.evaluate(`document.querySelector('.bot-controls button') === null`), true, 'Closed games expose no automation mutation');
-    console.log('Local automated opponents passed: creation/difficulties, real worker decisions, private bids, draft preservation, single-tab lease/takeover, setup and token flow, pending-worker rewind, explicit resume, phone layout and final abandonment.');
+    console.log('Local automated opponents passed: fixed-Hard creation, versioned worker decisions, private bids, draft preservation, single-tab lease/takeover, setup and token flow, pending-worker rewind, explicit resume, phone layout and final abandonment.');
 } finally {
     page.ws.close();
     if (second) {second.ws.close(); await fetch(`${cdp}/json/close/${second.target.id}`);}

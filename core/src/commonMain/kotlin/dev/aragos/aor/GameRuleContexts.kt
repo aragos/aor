@@ -1,6 +1,6 @@
 package dev.aragos.aor
 
-internal fun GameState.cardContext(): CardContext =
+internal fun GameState.buildCardContext(): CardContext =
     CardContext(
         players =
             players.mapValues { (_, owner) ->

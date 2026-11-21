@@ -93,6 +93,19 @@ data class AdvanceQuote(
 }
 
 object AdvancePurchases {
+    /**
+     * Dollar credit from the Institutional Research ability, before the zero-price floor. Ownership
+     * includes acquisition during the current turn; category credits remain separate.
+     */
+    fun institutionalResearchCredit(advance: AdvanceId, owned: Boolean): Int {
+        if (!owned) return 0
+        return when (AdvanceData.definition(advance).category) {
+            AdvanceCategory.CIVICS,
+            AdvanceCategory.RELIGION -> 0
+            else -> 10
+        }
+    }
+
     /** The misery part of a purchase, independent of prices, credits and eligibility checks. */
     fun miseryQuote(
         player: PlayerState,
@@ -149,14 +162,10 @@ object AdvancePurchases {
     ): AdvanceQuote {
         val definition = AdvanceData.definition(advance)
         val research =
-            if (
-                player.advances.owns(AdvanceId.INSTITUTIONAL_RESEARCH) &&
-                    definition.category !in setOf(AdvanceCategory.CIVICS, AdvanceCategory.RELIGION)
-            ) {
-                10
-            } else {
-                0
-            }
+            institutionalResearchCredit(
+                advance,
+                owned = player.advances.owns(AdvanceId.INSTITUTIONAL_RESEARCH),
+            )
         val writtenRecord = LeaderRules.writtenRecordBonus(player.advances.owned)
         val misery = miseryQuote(player, advance, context)
         return AdvanceQuote(

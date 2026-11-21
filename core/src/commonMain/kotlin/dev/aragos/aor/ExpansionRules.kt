@@ -47,10 +47,13 @@ data class AttackRequirement(val tokens: Int) {
     /** Rejects under- or over-commitment before spending [addedTokens] or requesting any roll. */
     fun validateCommitment(existingTokens: Int, addedTokens: Int) {
         checkRule(
-            existingTokens >= 0 &&
-                addedTokens >= 0 &&
-                existingTokens.toLong() + addedTokens.toLong() == tokens.toLong(),
+            accepts(existingTokens, addedTokens),
             ViolationCode.INVALID_ATTACK_TOKEN_COUNT,
         )
     }
+
+    internal fun accepts(existingTokens: Int, addedTokens: Int): Boolean =
+        existingTokens >= 0 &&
+            addedTokens >= 0 &&
+            existingTokens.toLong() + addedTokens.toLong() == tokens.toLong()
 }

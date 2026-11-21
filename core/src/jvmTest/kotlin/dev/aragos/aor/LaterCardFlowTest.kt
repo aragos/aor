@@ -98,7 +98,7 @@ class LaterCardFlowTest {
         assertThat(played.effects.papalCategory).isNull()
         assertThat(played.effects.religiousStrifePlayed).isTrue()
         assertThat(played.voids.papalDecree).isTrue()
-        assertThat(CardRules.isBurden(played.cardContext(), "papal-decree")).isTrue()
+        assertThat(CardRules.isBurden(played.cardContext, "papal-decree")).isTrue()
         assertThat(played.playerState(p1).hand.map { held -> held.definition.id })
             .contains("papal-decree")
     }
@@ -116,7 +116,7 @@ class LaterCardFlowTest {
         assertThat(decree.voids.papalDecree).isFalse()
         assertThat(
                 CardRules.isBurden(
-                    decree.copy(effects = CardTurnEffects()).cardContext(),
+                    decree.copy(effects = CardTurnEffects()).cardContext,
                     "papal-decree",
                 )
             )
@@ -173,7 +173,7 @@ class LaterCardFlowTest {
         val played = initial.play("p1: play hand-1")
 
         assertThat(played.voids.armorAndStirrups).isTrue()
-        assertThat(CardRules.isBurden(played.cardContext(), "armor")).isTrue()
+        assertThat(CardRules.isBurden(played.cardContext, "armor")).isTrue()
         assertThat(BoardGame.context(played).militaryPlays)
             .containsExactly(
                 MilitaryPlay(p2, MilitaryCard.STIRRUPS),

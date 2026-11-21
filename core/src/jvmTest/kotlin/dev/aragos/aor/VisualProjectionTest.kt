@@ -240,7 +240,7 @@ class VisualProjectionTest {
             )
             .isNotEmpty()
         assertThat(
-                CardRules.commodityPayment(state(board).cardContext(), commodities.first())
+                CardRules.commodityPayment(state(board).cardContext, commodities.first())
                     .payments[p1]
             )
             .isEqualTo(0)
@@ -292,7 +292,7 @@ class VisualProjectionTest {
 
         assertThat(owner.effectiveBox).isEqualTo(3)
         assertThat(owner.payout)
-            .isEqualTo(CardRules.commodityPayment(state.cardContext(), commodity).payments[p1])
+            .isEqualTo(CardRules.commodityPayment(state.cardContext, commodity).payments[p1])
     }
 
     @Test
