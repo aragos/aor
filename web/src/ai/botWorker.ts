@@ -11,24 +11,38 @@ type Job = {
 };
 
 const legacyVersion = 'aor-policy-1';
-const checkpoints = {
-    'aor-hard-2026-11-20-1': {
-        3: ['three-player-continuation-model.json', '7446542a3e85f3db8b31d0fda632ae0d4f1ff809188b68cfda5899841ff57624'],
-        4: ['continuation-model.json', '956b39695f744ce835a72af6452e33d061b74479a8b13938e3b968f18ce4556e'],
-        5: ['continuation-model.json', '956b39695f744ce835a72af6452e33d061b74479a8b13938e3b968f18ce4556e'],
-        6: ['broad-model.json', 'a479db4b3c7f580ce9979049fe407cbde4db22bf75b76d3cc54ac6f2039ce500'],
-    },
-} as const;
+const hardVersion = 'aor-hard-2026-11-20-1';
+const threePlayer = {
+    url: '/assets/automata/aor-hard-2026-11-20-1/three-player-continuation-model.json',
+    sha256: '7446542a3e85f3db8b31d0fda632ae0d4f1ff809188b68cfda5899841ff57624',
+};
+const fourAndFivePlayer = {
+    url: '/assets/automata/aor-hard-2026-11-20-1/continuation-model.json',
+    sha256: '956b39695f744ce835a72af6452e33d061b74479a8b13938e3b968f18ce4556e',
+};
+const sixPlayer = {
+    url: '/assets/automata/aor-hard-2026-11-20-1/broad-model.json',
+    sha256: 'a479db4b3c7f580ce9979049fe407cbde4db22bf75b76d3cc54ac6f2039ce500',
+};
 const modelByteLimit = 150_000;
 let selector: Promise<HardBotSelector> | undefined;
 let legacyModel: Promise<string> | undefined;
 
-async function loadCheckpoint(version: string, playerCount: number): Promise<HardBotSelector> {
-    if (!Object.prototype.hasOwnProperty.call(checkpoints, version) || playerCount < 3 || playerCount > 6) {
-        throw new Error('This game requires an unavailable automated opponent checkpoint.');
+function checkpointAsset(version: string, playerCount: number) {
+    if (version === hardVersion) {
+        switch (playerCount) {
+            case 3: return threePlayer;
+            case 4:
+            case 5: return fourAndFivePlayer;
+            case 6: return sixPlayer;
+        }
     }
-    const [file, expectedHash] = checkpoints[version as keyof typeof checkpoints][playerCount as 3 | 4 | 5 | 6];
-    const response = await fetch(`/assets/automata/${version}/${file}`, {credentials: 'omit'});
+    throw new Error('This game requires an unavailable automated opponent checkpoint.');
+}
+
+async function loadCheckpoint(version: string, playerCount: number): Promise<HardBotSelector> {
+    const asset = checkpointAsset(version, playerCount);
+    const response = await fetch(asset.url, {credentials: 'omit'});
     if (!response.ok) throw new Error('The automated opponent checkpoint is unavailable.');
     const bytes = await response.arrayBuffer();
     if (bytes.byteLength === 0 || bytes.byteLength > modelByteLimit) {
@@ -36,7 +50,7 @@ async function loadCheckpoint(version: string, playerCount: number): Promise<Har
     }
     const digest = await crypto.subtle.digest('SHA-256', bytes);
     const hash = Array.from(new Uint8Array(digest), byte => byte.toString(16).padStart(2, '0')).join('');
-    if (hash !== expectedHash) throw new Error('The automated opponent checkpoint failed verification.');
+    if (hash !== asset.sha256) throw new Error('The automated opponent checkpoint failed verification.');
     const {HardBotSelector} = await import('aor-ai');
     return new HardBotSelector(new TextDecoder().decode(bytes), playerCount);
 }
