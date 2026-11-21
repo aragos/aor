@@ -700,6 +700,31 @@ class BotAutomationTest(private val postgres: Boolean) {
         }
 
     @Test
+    fun automatedTurnOrderChoicesRunThroughToTheDrawWithoutPausing() =
+        AutomationFixture(postgres).use { fixture ->
+            fixture.prepareTokenPurchase()
+            val work = fixture.setPhasePause(enabled = true, expectedEpoch = fixture.claim().epoch)
+            val firstBid = fixture.submit(work, work.observations.single(), "buy-tokens 0")
+            fixture.submit(firstBid, firstBid.observations.single(), "buy-tokens 0")
+            val reveal = fixture.humanCommand("buy-tokens 0")
+            val automation = checkNotNull(reveal.automation) { "The fixture must have automation." }
+            assertThat(automation.pausedAfterPhase).isEqualTo(Stage.TOKEN_PURCHASE)
+            val resumed = fixture.control("resume", automation.epoch)
+
+            val firstTie =
+                fixture.submit(resumed, resumed.observations.single(), "choose-turn-position 1")
+            val secondTie =
+                fixture.submit(firstTie, firstTie.observations.single(), "choose-turn-position 2")
+
+            assertThat(firstTie.paused).isFalse()
+            assertThat(secondTie.paused).isFalse()
+            assertThat(
+                    fixture.snapshot().events.count { it.drawReason == CardDrawReason.TURN_DRAW }
+                )
+                .isEqualTo(3)
+        }
+
+    @Test
     fun resumeClearsThePhaseReasonAndKeepsTheSetting() =
         AutomationFixture(postgres).use { fixture ->
             val work = fixture.setPhasePause(enabled = true, expectedEpoch = fixture.claim().epoch)

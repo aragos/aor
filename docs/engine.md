@@ -45,6 +45,10 @@ from turn 1 in new games. Existing saves are archived and activate after the las
 recorded play, including superseded revisions. Exports without the activation field retain the
 older full-occupancy rule during replay.
 
+Automatic Chaos ordering applies from the header's `automaticChaosOrderFromTurn`. Startup archives
+older saves and activates the rule after the last recorded token reveal, including superseded
+revisions. Earlier turns and exports without this field replay their original tie choices.
+
 Draw-three-keep-two is additive and disabled by default. Older creation revisions containing the
 original four options remain valid and retain the one-card setup and ordinary turn 1 draw. New
 creation revisions explicitly record the variant; returns and reshuffles replay without randomness.

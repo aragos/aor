@@ -33,6 +33,10 @@ fun createConfiguredGameService(environment: Map<String, String> = System.getenv
         LoggerFactory.getLogger("CaravanTransitMigration")
             .info("Upgraded Caravan transit rules for game {}", id)
     }
+    ChaosOrderMigration.run(store).forEach { id ->
+        LoggerFactory.getLogger("ChaosOrderMigration")
+            .info("Upgraded automatic Chaos ordering for game {}", id)
+    }
     LinearGameMigration.run(store).forEach { id ->
         LoggerFactory.getLogger("LinearGameMigration").info("Upgraded Linear game {}", id)
     }

@@ -77,11 +77,14 @@ data class TurnOrderSelection(
 
     companion object {
         /**
-         * Rank [purchases] by their signed amounts, using [capitalOrder] to sequence tie choices.
+         * Rank [purchases] by signed amount and sequence tie choices in [capitalOrder].
+         * [chaosPlayers] occupy the end of the zero-bid group in reverse capital-choice order.
+         * Historical rules pass an empty list so those seats retain their recorded tie choices.
          */
         fun fromPurchases(
             purchases: Map<PlayerId, Int>,
             capitalOrder: List<PlayerId>,
+            chaosPlayers: Set<PlayerId> = emptySet(),
         ): TurnOrderSelection {
             require(capitalOrder.distinct().size == capitalOrder.size) {
                 "Capital-choice order cannot repeat a player."
@@ -89,11 +92,18 @@ data class TurnOrderSelection(
             require(purchases.keys == capitalOrder.toSet()) {
                 "Every capital chooser must have exactly one token purchase."
             }
-            val ranked = capitalOrder.sortedBy { player -> purchases[player] }
+            require(chaosPlayers.all { player -> purchases[player] == 0 }) {
+                "Players in Chaos must have zero token purchases."
+            }
+            val ranked =
+                (capitalOrder.filterNot(chaosPlayers::contains) +
+                        capitalOrder.asReversed().filter(chaosPlayers::contains))
+                    .sortedBy { player -> purchases[player] }
             return TurnOrderSelection(
                 order = ranked,
                 ties =
                     ranked
+                        .filterNot(chaosPlayers::contains)
                         .groupBy { player -> purchases[player] }
                         .values
                         .filter { players -> players.size > 1 }

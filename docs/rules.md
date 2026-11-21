@@ -204,7 +204,9 @@ Play. Token purchase is simultaneous; Income has no Renaissance window.
     - Ties: the player that chose its capital later decides its position relative to the other tied players.
       Resolve a tied group in capital-choice order: the earliest chooser forms the initial sequence, and each later
       chooser inserts itself before, between or after those already placed. Later capital choosers decide last.
-    - Players in Chaos count as bidding 0.
+    - Players in Chaos count as bidding 0. They occupy the end of the zero-bid group in reverse
+      capital-choice order, including any setup tie rolls. Active players tied at zero choose their
+      positions relative to each other.
 4. **Boxes.** Players occupy the order-of-play boxes for the player count:
 
 | Players | Boxes used |

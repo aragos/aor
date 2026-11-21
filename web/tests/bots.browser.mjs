@@ -90,22 +90,23 @@ try {
     await page.click('Pause automated opponents');
     await waitState(snapshot => snapshot.automation.paused, 'pause is durable');
     assert.equal(await page.evaluate(`document.querySelector('#bid').value`), '7', 'Pausing does not clear a valid bid draft');
-    await page.evaluate(`document.querySelector('.bot-controls button').scrollIntoView({block: 'nearest'})`);
+    await page.wait(`document.querySelector('.bot-activity-shortcut')`, 'Activity shortcut for the pause');
+    await page.click('View activity');
+    await page.evaluate(`document.querySelector('.bot-phase-pause button').scrollIntoView({block: 'nearest'})`);
     await page.viewportScreenshot(join(process.env.AOR_BROWSER_ARTIFACTS, 'automated-opponents-desktop.png'));
     await page.send('Emulation.setDeviceMetricsOverride', {width: 390, height: 844, deviceScaleFactor: 1, mobile: true});
     await page.wait(`document.querySelector('#tab-players')`, 'phone Players workspace');
-    await click('#tab-players');
-    await page.evaluate(`document.querySelector('.bot-controls button').scrollIntoView({block: 'nearest'})`);
+    await page.evaluate(`document.querySelector('.bot-phase-pause button').scrollIntoView({block: 'nearest'})`);
     assert.equal(await page.evaluate(`document.documentElement.scrollWidth <= innerWidth + 1`), true, 'Automated controls fit on a phone');
     assert.equal(await page.evaluate(`(() => {
-        const button = document.querySelector('.bot-controls button').getBoundingClientRect();
-        return Boolean(document.elementFromPoint(button.x + button.width / 2, button.y + button.height / 2)?.closest('.bot-controls'));
-    })()`), true, 'The automation control is reachable after scrolling the Players workspace');
+        const button = document.querySelector('.bot-phase-pause button').getBoundingClientRect();
+        return Boolean(document.elementFromPoint(button.x + button.width / 2, button.y + button.height / 2)?.closest('.bot-phase-pause'));
+    })()`), true, 'The automation control is reachable after scrolling Activity');
     assert.equal(await page.evaluate(`document.querySelector('.game-name').getBoundingClientRect().right <= document.querySelector('.private-seat-link').getBoundingClientRect().left + 1`), true, 'Long game names leave space for the private seat link');
     await page.viewportScreenshot(join(process.env.AOR_BROWSER_ARTIFACTS, 'automated-opponents-phone.png'));
     await page.send('Emulation.setDeviceMetricsOverride', {width: 1440, height: 980, deviceScaleFactor: 1, mobile: false});
     await page.wait(`!document.querySelector('#tab-players')`, 'desktop layout returns');
-    await page.wait(`document.querySelector('.bot-controls button')?.textContent === 'Resume automated opponents' && !document.querySelector('.bot-controls button').disabled`, 'paused snapshot and control are settled');
+    await page.wait(`document.querySelector('.bot-phase-pause button')?.textContent === 'Resume automated opponents' && !document.querySelector('.bot-phase-pause button').disabled`, 'paused snapshot and control are settled');
     // A direct refresh can lose its result to a newer poll. Retain the paused representation
     // deliberately, then require the ordinary conditional read to reconcile the control change.
     await page.evaluate(`(async () => {
@@ -148,6 +149,7 @@ try {
     await page.wait(`document.querySelector('.bot-controls button')?.textContent === 'Pause automated opponents' && !document.querySelector('.bot-controls button').disabled`, 'resumed UI recovers after the missed direct refresh');
     assert.equal(await page.evaluate(`document.querySelector('#bid').value`), '7', 'Automation polling preserves the prepared human bid');
     await page.evaluate('window.restoreBotSnapshotFetch()');
+    await click('#tab-map');
 
     second = await open(web + path);
     await second.wait(`document.querySelector('.bot-controls')`, 'second StrictMode game mount');
@@ -200,6 +202,7 @@ try {
         return label?.querySelector('svg') && label.textContent.toLowerCase() === ${JSON.stringify(capital)};
     })()`, 'the pause identifies the automated seat by its chosen capital and symbol');
     assert.equal(await page.evaluate(`document.querySelector('.bot-phase-pause button').closest('#workspace-activity')?.hidden`), true, 'Resume belongs to the activity workspace');
+    await page.wait(`document.querySelector('.bot-activity-shortcut')`, 'Activity shortcut for the pause');
     await page.click('View activity');
     await page.wait(`document.querySelector('#tab-activity')?.getAttribute('aria-selected') === 'true' && !document.querySelector('#workspace-activity').hidden`, 'activity shortcut opens the activity workspace');
     assert.equal(await page.evaluate(`!document.querySelector('.bot-controls button')`), true, 'The phase pause has one Resume action');
@@ -219,6 +222,7 @@ try {
     await page.wait(`!document.querySelector('#tab-players') && document.querySelector('.decision-panel[data-action-ready="true"]') && !document.querySelector('.bot-phase-pause')`, 'the next human action hides the pause in the activity workspace');
     await click('.bot-phase-option input');
     await waitState(snapshot => !snapshot.automation.pauseAfterPhase, 'creator can restore continuous play');
+    await click('#tab-map');
     assert.equal(phasePause.events.filter(event => event.kind === 'BID_CAPITAL').length, 3);
     for (let step = 0; step < 30; step++) {
         const snapshot = await state();
@@ -242,7 +246,12 @@ try {
     assert.equal(rewound.automation.paused, true, 'History rewind revokes local automation');
     const restored = rewound.revision;
     await page.evaluate('window.holdBotComputation = false');
-    await page.wait(`document.querySelector('.bot-controls').textContent.includes('paused')`, 'history pause is visible');
+    assert.equal(rewound.automation.pausedAfterPhase, null, 'A rewind pause has no phase label');
+    await page.wait(`document.querySelector('.bot-activity-shortcut')`, 'Activity shortcut for the pause');
+    await page.click('View activity');
+    await page.wait(`document.querySelector('.bot-phase-pause')?.textContent.includes('paused') &&
+        document.querySelector('.bot-phase-pause button')?.offsetWidth > 0`, 'history pause can be resumed from Activity');
+    assert.equal(await page.evaluate(`!document.querySelector('.bot-controls button')`), true, 'The rewind pause has one Resume action');
     await pause(1200);
     assert.equal((await state()).revision, restored, 'Obsolete worker work cannot recreate undone play');
     await page.click('Resume automated opponents');
