@@ -166,9 +166,38 @@ try {
     second.ws.close(); second = null;
     await page.send('Page.bringToFront');
 
-    await page.fill('#bid', '7');
+    await page.wait(`(() => {
+        const toggle = document.querySelector('.bot-phase-option input');
+        return toggle?.offsetWidth > 0 && !toggle.disabled &&
+            document.querySelector('.bot-controls button')?.textContent === 'Pause automated opponents';
+    })()`, 'phase pause is available after the lease transfer');
+    assert.equal(await page.evaluate(`document.querySelector('.bot-phase-option input').checked`), false);
+    await click('.bot-phase-option input');
+    await waitState(snapshot => snapshot.automation.pauseAfterPhase, 'phase pause setting is durable');
+    await page.wait(`document.querySelector('.bot-phase-option input').checked`, 'saved setting appears');
+    assert.equal(await page.evaluate(`document.querySelector('#bid').value`), '7', 'Saving the setting preserves the bid draft');
+    assert.equal((await state()).automation.paused, false, 'Unrevealed bids do not pause bots');
     await click('.bid-action');
-    await waitState(snapshot => snapshot.game.stage !== 'BIDDING', 'capital bids reveal normally');
+    const phasePause = await waitState(snapshot => snapshot.automation.pausedAfterPhase === 'BIDDING', 'capital bids reveal and automation pauses at the phase boundary');
+    await page.wait(`document.querySelector('.bot-phase-pause')?.textContent.includes('Capital bids')`, 'the pause explains which phase ended');
+    await page.viewportScreenshot(join(process.env.AOR_BROWSER_ARTIFACTS, 'automated-phase-pause-desktop.png'));
+    await page.click('View activity');
+    await page.wait(`document.querySelector('#tab-activity')?.getAttribute('aria-selected') === 'true' && !document.querySelector('#workspace-activity').hidden`, 'activity shortcut opens the activity workspace');
+    assert.equal(await page.evaluate(`!document.querySelector('.bot-controls button')`), true, 'The phase pause has one Resume action');
+    await page.send('Emulation.setDeviceMetricsOverride', {width: 390, height: 844, deviceScaleFactor: 1, mobile: true});
+    await page.wait(`(() => {
+        const button = document.querySelector('.bot-phase-pause button:last-child').getBoundingClientRect();
+        return document.documentElement.scrollWidth <= innerWidth + 1 &&
+            document.elementFromPoint(button.x + button.width / 2, button.y + button.height / 2)?.closest('.bot-phase-pause');
+    })()`, 'Resume is visible and reachable on a phone');
+    await page.viewportScreenshot(join(process.env.AOR_BROWSER_ARTIFACTS, 'automated-phase-pause-phone.png'));
+    await page.click('Resume automated opponents');
+    await waitState(snapshot => !snapshot.automation.paused && snapshot.automation.pauseAfterPhase, 'Resume keeps the phase pause setting enabled');
+    await page.send('Emulation.setDeviceMetricsOverride', {width: 1440, height: 980, deviceScaleFactor: 1, mobile: false});
+    await page.wait(`!document.querySelector('#tab-players') && !document.querySelector('.bot-phase-pause')`, 'Resume clears the phase status');
+    await click('.bot-phase-option input');
+    await waitState(snapshot => !snapshot.automation.pauseAfterPhase, 'creator can restore continuous play');
+    assert.equal(phasePause.events.filter(event => event.kind === 'BID_CAPITAL').length, 3);
     for (let step = 0; step < 30; step++) {
         const snapshot = await state();
         if (snapshot.game.stage === 'TOKEN_PURCHASE') break;

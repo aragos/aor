@@ -551,6 +551,92 @@ class BotAutomationTest(private val postgres: Boolean) {
         }
 
     @Test
+    fun creatorCanReviewBotBidsAfterAHumanClosesThePhase(): Unit =
+        AutomationFixture(postgres).use { fixture ->
+            val work = fixture.setPhasePause(enabled = true, expectedEpoch = fixture.claim().epoch)
+            val firstBid = fixture.submit(work, work.observations.single(), "bid-capital 2")
+            val secondBid =
+                fixture.submit(firstBid, firstBid.observations.single(), "bid-capital 3")
+            assertThat(secondBid.paused).isFalse()
+            assertThat(fixture.snapshot().events.map(HistoryEventView::kind))
+                .doesNotContain(HistoryEventKind.BID_CAPITAL)
+
+            val revealed = fixture.humanCommand("bid-capital 4")
+
+            val reopened = fixture.reopened().get(fixture.game.gameId, fixture.access())
+            assertThat(reopened.automation).isEqualTo(revealed.automation)
+            assertThat(revealed.automation?.pausedAfterPhase).isEqualTo(Stage.BIDDING)
+            assertThat(revealed.events.filter { it.kind == HistoryEventKind.BID_CAPITAL })
+                .hasSize(3)
+            assertThat(revealed.prompt?.players).containsExactly(PlayerId("p1"))
+        }
+
+    @Test
+    fun resumeClearsThePhaseReasonAndKeepsTheSetting() =
+        AutomationFixture(postgres).use { fixture ->
+            val work = fixture.setPhasePause(enabled = true, expectedEpoch = fixture.claim().epoch)
+            fixture.humanCommand("bid-capital 1")
+            val firstBid = fixture.submit(work, work.observations.single(), "bid-capital 2")
+            val operationId = UUID.randomUUID().toString()
+            val revealed =
+                fixture.submit(
+                    firstBid,
+                    firstBid.observations.single(),
+                    "bid-capital 3",
+                    operationId,
+                )
+            val reconciled = fixture.read(firstBid.epoch)
+            assertThat(reconciled.paused).isTrue()
+            assertThat(reconciled.observations).isEmpty()
+            assertThat(reconciled.operationReceipts).contains(operationId)
+
+            val resumed = fixture.control("resume", revealed.epoch)
+
+            assertThat(resumed.paused).isFalse()
+            assertThat(resumed.observations.single().seat).isEqualTo(PlayerId("p3"))
+            assertThat(fixture.snapshot().automation?.pausedAfterPhase).isNull()
+            assertThat(fixture.snapshot().automation?.pauseAfterPhase).isTrue()
+        }
+
+    @Test
+    fun urbanAscendancyPurchaseAloneDoesNotPauseBots() =
+        AutomationFixture(postgres).use { fixture ->
+            val ready = fixture.prepareBotUrbanAscendancy()
+            val work = fixture.setPhasePause(enabled = true, expectedEpoch = fixture.claim().epoch)
+            val after = fixture.submit(work, work.observations.single(), "buy-card")
+
+            assertThat(after.paused).isFalse()
+            val snapshot = fixture.snapshot()
+            assertThat(snapshot.game.stage).isNotEqualTo(Stage.BUY_CARD)
+            assertThat(snapshot.events.last { it.kind == HistoryEventKind.BUY_CARD }.actor)
+                .isEqualTo(ready)
+        }
+
+    @Test
+    fun legacyBotRunnerDocumentsDefaultToContinuousPlay() =
+        AutomationFixture(postgres).use { fixture ->
+            val work = fixture.claim()
+            val pending = fixture.submit(work, work.observations.single(), "bid-capital 2")
+            val root = json.readTree(fixture.document()) as ObjectNode
+            (root["botRunner"] as ObjectNode).remove(listOf("pauseAfterPhase", "pausedAfterPhase"))
+            val restored = GameDocuments.read(fixture.game.gameId, root)
+
+            val next =
+                fixture.service.driver.submit(
+                    restored,
+                    pending.observations.single().seat,
+                    "bid-capital 3",
+                )
+            val revealed = fixture.service.driver.submit(next, PlayerId("p1"), "bid-capital 4")
+
+            assertThat(restored.pendingBids).containsExactly(PlayerId("p2"), 2)
+            assertThat(revealed.state().stage).isEqualTo(Stage.CAPITAL_CHOICE)
+            assertThat(revealed.botRunner?.paused).isFalse()
+            assertThat(revealed.botRunner?.pauseAfterPhase).isFalse()
+            assertThat(revealed.botRunner?.pausedAfterPhase).isNull()
+        }
+
+    @Test
     fun oldHumanOnlyDocumentsLoadReplayAndContinueWithoutBotFields() =
         AutomationFixture(postgres, humans = 3, bots = 0).use { fixture ->
             val root = json.readTree(fixture.document()) as ObjectNode
@@ -625,6 +711,18 @@ private class AutomationFixture(
         now: Long = 1000,
     ): BotWork =
         BotAutomation.control(service, game.gameId, access(), operation, runner, expectedEpoch, now)
+
+    fun setPhasePause(enabled: Boolean, expectedEpoch: Int): BotWork =
+        BotAutomation.control(
+            service,
+            game.gameId,
+            access(),
+            "set-phase-pause",
+            runnerId,
+            expectedEpoch,
+            now = 1000,
+            pauseAfterPhase = enabled,
+        )
 
     fun submit(
         work: BotWork,
@@ -717,6 +815,44 @@ private class AutomationFixture(
                 service.driver.submit(current, player.id, Command.BuyTokens(3 - index))
             }
         }
+    }
+
+    fun prepareBotUrbanAscendancy(): PlayerId {
+        prepareFirstTurn()
+        val bot = PlayerId("p2")
+        val ready =
+            service.store.update(game.gameId) { initial ->
+                var current = initial
+                repeat(100) {
+                    val state = current.state()
+                    when (val prompt = state.prompts().single()) {
+                        is Prompt.MultiPlayer -> {
+                            current =
+                                prompt.players.fold(current) { game, player ->
+                                    service.driver.submit(game, player, "buy-tokens 0")
+                                }
+                        }
+                        is Prompt.SinglePlayer -> {
+                            val actor = prompt.player
+                            val choices = state.legalChoices(actor).commands
+                            if (actor == bot && "buy-card" in choices) return@update current
+                            val command =
+                                when {
+                                    actor == bot && "buy-advance V" in choices -> "buy-advance V"
+                                    "stabilize cash" in choices -> "stabilize cash"
+                                    "stabilize misery" in choices -> "stabilize misery"
+                                    "pass" in choices -> "pass"
+                                    else -> choices.first()
+                                }
+                            current = service.driver.submit(current, actor, command)
+                        }
+                        is Prompt.System ->
+                            error("The authority must resolve outcomes before publishing a game.")
+                    }
+                }
+                error("The fixture must reach the automated Urban Ascendancy purchase.")
+            }
+        return (ready.state().prompts().single() as Prompt.SinglePlayer).player
     }
 
     fun reopened(): GameService =

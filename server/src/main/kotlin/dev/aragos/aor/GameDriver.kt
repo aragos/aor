@@ -270,7 +270,8 @@ class GameDriver(private val random: SetupRandom = AuthorityRandom()) {
         actions: List<Entry.Action>,
     ): StoredGame {
         val stateAfterActions = actions.fold(state) { current, action -> current.step(action) }
-        val entries = actions + resolveOutcomes(stateAfterActions)
+        val (outcomes, after) = resolveOutcomes(stateAfterActions)
+        val entries = actions + outcomes
         val revision =
             Revision(
                 id = stored.revision + 1,
@@ -279,32 +280,38 @@ class GameDriver(private val random: SetupRandom = AuthorityRandom()) {
                 command = command,
                 entries = entries.map(TextCodec::print),
             )
-        return stored.copy(revisions = stored.revisions + revision, submissionVersions = emptyMap())
+        val committed =
+            stored.copy(revisions = stored.revisions + revision, submissionVersions = emptyMap())
+        return BotAutomation.afterCommit(committed, state, after)
     }
 
-    private fun resolveOutcomes(state: GameState): List<Entry> = buildList {
+    private fun resolveOutcomes(state: GameState): Pair<List<Entry>, GameState> {
         var current = state
-        while (true) {
-            val need = (current.prompts().singleOrNull() as? Prompt.System)?.need ?: break
-            val outcome =
-                when (need) {
-                    is SystemNeed.Shuffle -> Entry.Shuffle(random.shuffle(need.cards))
-                    is SystemNeed.Draw -> GameOutcome.Draw(need.player, need.reference, need.card)
-                    is SystemNeed.GameRoll ->
-                        GameOutcome.Roll(need.kind, random.roll(need.diceCount), need.players)
-                    is SystemNeed.Trade -> {
-                        val references =
-                            current.playerState(need.owner).hand.map(HandCard::reference)
-                        GameOutcome.Trade(
-                            need.owner,
-                            need.recipient,
-                            random.shuffle(references).first(),
-                        )
+        val outcomes = buildList {
+            while (true) {
+                val need = (current.prompts().singleOrNull() as? Prompt.System)?.need ?: break
+                val outcome =
+                    when (need) {
+                        is SystemNeed.Shuffle -> Entry.Shuffle(random.shuffle(need.cards))
+                        is SystemNeed.Draw ->
+                            GameOutcome.Draw(need.player, need.reference, need.card)
+                        is SystemNeed.GameRoll ->
+                            GameOutcome.Roll(need.kind, random.roll(need.diceCount), need.players)
+                        is SystemNeed.Trade -> {
+                            val references =
+                                current.playerState(need.owner).hand.map(HandCard::reference)
+                            GameOutcome.Trade(
+                                need.owner,
+                                need.recipient,
+                                random.shuffle(references).first(),
+                            )
+                        }
                     }
-                }
-            current = current.step(outcome)
-            add(outcome)
+                current = current.step(outcome)
+                add(outcome)
+            }
         }
+        return outcomes to current
     }
 }
 

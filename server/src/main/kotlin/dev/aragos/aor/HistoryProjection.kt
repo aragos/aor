@@ -98,6 +98,26 @@ internal object HistoryProjection {
         )
     }
 
+    /** Activity is the source for which committed choices warrant a phase review. */
+    fun hasAutomatedDecision(game: StoredGame, phase: Stage, turnNumber: Int?): Boolean {
+        val events =
+            forPlayer(game, viewer = null).events.filter { event ->
+                event.stage.tablePhase() == phase && event.turnNumber == turnNumber
+            }
+        if (events.any { event -> event.tokenPurchases.any { it.player in game.bots } }) {
+            return true
+        }
+        val decisionIds =
+            events
+                .filter { it.actor != null && it.kind != HistoryEventKind.BUY_CARD }
+                .map(HistoryEventView::id)
+                .toSet()
+        return game.effectiveEntries().asReversed().any { recorded ->
+            recorded.id in decisionIds &&
+                (TextCodec.parse(recorded.text) as? Entry.Action)?.actor in game.bots
+        }
+    }
+
     /** Public audit facts are shared by viewers; prefixes are bounded and local to this replay. */
     internal fun auditEvents(stored: StoredGame): List<HistoryEventView> {
         val events = mutableListOf<HistoryEventView>()
