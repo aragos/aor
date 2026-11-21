@@ -64,8 +64,8 @@ try {
                 card.definition.id === leader.definition.id ? {...card, leaderDiscounts: [discount]} : card)};
         await show('play-cards', leaderChanges, ['play rebate-leader', 'pass']);
         await click('#tab-map');
-        const title = await page.evaluate(`document.querySelector('[data-map-province="${furProvince.id}"] > title').textContent`);
-        assert.match(title, /Fur/, 'Province hover text includes its commodity');
+        await page.evaluate(`document.querySelector('[data-map-province="${furProvince.id}"]').dispatchEvent(new FocusEvent('focusin', {bubbles:true}))`);
+        await page.wait(`document.querySelector('.map-tooltip')?.textContent.includes('Fur')`, 'Province tooltip includes its commodity');
         assert.match(await page.evaluate(`document.querySelector('[data-map-province="${furProvince.id}"]').getAttribute('aria-label')`),
             /Fur/, 'The accessible province name retains its commodity');
         assert.match(await page.evaluate(`document.querySelector('[data-hand-card="rebate-leader"] .leader-discount.has-rebate').textContent`),

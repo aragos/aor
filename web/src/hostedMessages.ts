@@ -45,7 +45,7 @@ export const hostedMessages: Record<string, string> = {
     "hosted.a-unique-handle-lets-other": "Other players can find and invite you using this handle.",
     "hosted.register-player": "Register player",
     "hosted.verification-email-sent": "Verification email sent.",
-    "hosted.if-verification-is-complete-your": "If verification is complete, your player registration will appear.",
+    "hosted.emailStillUnverified": "Verification is still pending. Open the link in your email and return here.",
     "hosted.verify-your-email": "Verify your email",
     "hosted.ive-verified-my-email": "I’ve verified my email",
     "hosted.resend-email": "Resend email",

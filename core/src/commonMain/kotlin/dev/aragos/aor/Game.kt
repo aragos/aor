@@ -35,6 +35,11 @@ data class GameHeader(
      * activate after the latest historical turn, preserving current and rewound recorded draws.
      */
     val drawRenaissanceFromTurn: Int = 1,
+    /**
+     * First turn when only dark pieces can block Caravan. Null retains the historical full province
+     * rule for every turn, including when replaying older exported logs.
+     */
+    val darkCaravanFromTurn: Int? = 1,
 ) {
     init {
         require(players.size in 3..6) { "A game requires 3 through 6 players." }
@@ -49,6 +54,9 @@ data class GameHeader(
         }
         require(drawRenaissanceFromTurn > 0) {
             "The Draw Card Renaissance activation turn must be positive."
+        }
+        require(darkCaravanFromTurn == null || darkCaravanFromTurn > 0) {
+            "The Caravan activation turn must be positive when set."
         }
         CatalogVersion.fromWire(dataVersion)
     }

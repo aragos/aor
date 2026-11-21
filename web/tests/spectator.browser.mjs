@@ -29,7 +29,7 @@ export async function checkSpectator(page, web, baseline) {
     assert.equal(await page.evaluate(`document.querySelectorAll('.player-summary').length`), baseline.game.players.length,
         'All public player summaries remain visible');
     if (baseline.game.turnOrder.length) {
-        await page.evaluate(`document.querySelector('.player-turn-order .help-link').click()`);
+        await page.evaluate(`document.querySelector('.player-turn-order [data-help-topic="turn-order"]').click()`);
         await page.wait(`document.querySelector('#turn-order .order-track')`, 'spectator turn-order reference');
         assert.equal(await page.evaluate(`document.querySelectorAll('#turn-order .order-track-player').length`), baseline.game.players.length);
         assert.equal(await page.evaluate(`document.querySelectorAll('#turn-order .is-viewer').length`), 0,

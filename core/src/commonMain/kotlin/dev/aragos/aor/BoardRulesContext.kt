@@ -21,6 +21,7 @@ data class BoardPlayerProfile(
  *
  * [shipped] counts newly delivered physical tokens per destination in this Expansion phase,
  * including failed attacks. Existing tokens already in a province are never charged again.
+ * [onlyDarkPiecesBlockCaravan] selects the current transit rule over historical full occupancy.
  */
 data class BoardRulesContext(
     val configuration: CatalogConfiguration,
@@ -28,6 +29,7 @@ data class BoardRulesContext(
     val players: Map<PlayerId, BoardPlayerProfile>,
     val shipped: Map<PlayerId, Map<ProvinceId, Int>> = emptyMap(),
     val militaryPlays: List<MilitaryPlay> = emptyList(),
+    val onlyDarkPiecesBlockCaravan: Boolean = true,
 ) {
     val provinceIds: Set<ProvinceId>
         get() = configuration.provinceIds

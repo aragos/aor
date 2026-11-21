@@ -30,10 +30,12 @@ export async function checkHosted(page, web, artifacts) {
                 apiKey: 'browser-test-key', projectId: 'browser-test', authDomain: 'browser-test.firebaseapp.com',
             }, pollIntervalMs: 1000, automataVersion: "aor-hard-test"});
             else {
-                assert.equal(params.request.headers.Authorization, 'Bearer firebase-id-token');
+                const token = params.request.headers.Authorization;
+                assert(['Bearer firebase-id-token', 'Bearer firebase-verified-token'].includes(token));
                 if (path === '/api/me') {
-                    sessions.push(params.request.headers.Authorization);
-                    body = JSON.stringify({id: account?.id ?? 'google-player', emailVerified, account});
+                    sessions.push(token);
+                    body = JSON.stringify({id: account?.id ?? 'google-player',
+                        emailVerified: emailVerified || token === 'Bearer firebase-verified-token', account});
                     if (holdSession) {holdSession = false; await new Promise(resolve => {releaseSession = resolve;});}
                 } else if (path === '/api/players/register') {
                     const registration = JSON.parse(params.request.postData);
@@ -125,7 +127,7 @@ export async function checkHosted(page, web, artifacts) {
                 {method: 'sendPasswordResetEmail', email: 'player@example.com'});
             assert.equal(await page.evaluate(`window.firebaseTest.calls.some(call => call.method === 'signInWithEmailAndPassword')`), false);
         });
-        await check('Email account creation sends verification before player registration', async () => {
+        await check('Email verification opens registration on returning to the signup tab', async () => {
             emailVerified = false;
             await page.click('Create account');
             await page.fill('input[type=email]', 'player@example.com');
@@ -136,7 +138,19 @@ export async function checkHosted(page, web, artifacts) {
             await page.wait(`document.querySelector('h1')?.textContent === 'Verify your email'`, 'Account email verification');
             assert.deepEqual(await page.evaluate(`window.firebaseTest.calls.find(call => call.method === 'createUserWithEmailAndPassword')`),
                 {method: 'createUserWithEmailAndPassword', email: 'player@example.com', password: 'fixture-password'});
-            assert.equal(await page.evaluate(`window.firebaseTest.calls.filter(call => call.method === 'sendEmailVerification').length`), 1);
+            assert.deepEqual(await page.evaluate(`window.firebaseTest.calls.filter(call => call.method === 'sendEmailVerification')`),
+                [{method: 'sendEmailVerification', url: web + '/play'}]);
+            await page.evaluate(`window.firebaseTest.rejectContinueUrl = true`);
+            await page.click('Resend email');
+            await page.wait(`document.querySelector('[role=status]')?.textContent.includes('Verification email sent')`, 'Verification email still sends from alternate domains');
+            assert.deepEqual(await page.evaluate(`window.firebaseTest.calls.filter(call => call.method === 'sendEmailVerification').map(call => call.url)`),
+                [web + '/play', web + '/play', null]);
+            await page.click('I’ve verified my email');
+            await page.wait(`document.querySelector('[role=status]')?.textContent.includes('Verification is still pending')`, 'Unverified account can retry');
+            await page.evaluate(`window.firebaseTest.setEmailVerified(true); window.dispatchEvent(new FocusEvent('focus'))`);
+            await page.wait(`document.querySelector('input[autocomplete=username]')`, 'Player registration without signing back in');
+            assert.equal(sessions.at(-1), 'Bearer firebase-verified-token');
+            assert.equal(await page.evaluate(`window.firebaseTest.calls.some(call => call.method === 'signInWithEmailAndPassword')`), false);
         });
         await check('Google popup disables concurrent sign-in actions', async () => {
             await page.click('Sign in with Google');
@@ -295,6 +309,7 @@ export async function checkHosted(page, web, artifacts) {
         });
         await check('Server email verification remains required for Google users', async () => {
             emailVerified = false;
+            await page.evaluate(`window.firebaseTest.setEmailVerified(false)`);
             await page.click('Sign in with Google');
             await page.evaluate(`window.firebaseTest.finishPopup()`);
             await page.wait(`document.querySelector('h1')?.textContent === 'Verify your email'`, 'Server verification requirement');

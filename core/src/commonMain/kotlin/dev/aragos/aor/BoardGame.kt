@@ -84,6 +84,10 @@ object BoardGame {
         BoardRulesContext(
             configuration = state.catalog,
             board = state.board,
+            onlyDarkPiecesBlockCaravan =
+                state.header.darkCaravanFromTurn?.let { fromTurn ->
+                    (state.turnNumber ?: 0) >= fromTurn
+                } ?: false,
             players =
                 state.players.mapValues { entry ->
                     val player = entry.value

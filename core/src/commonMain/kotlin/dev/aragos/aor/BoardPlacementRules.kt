@@ -44,10 +44,14 @@ internal class PlacementAssessment
 private constructor(
     val plan: PlacementPlan?,
     val blocker: ViolationCode?,
+    private val intermediate: ProvinceId?,
 ) {
-    constructor(plan: PlacementPlan) : this(plan, null)
+    constructor(plan: PlacementPlan) : this(plan, null, null)
 
-    constructor(blocker: ViolationCode) : this(null, blocker)
+    constructor(
+        blocker: ViolationCode,
+        intermediate: ProvinceId? = null,
+    ) : this(null, blocker, intermediate)
 
     fun requirePlan(destination: ProvinceId): PlacementPlan {
         plan?.let {
@@ -56,7 +60,7 @@ private constructor(
         val code = checkNotNull(blocker) { "A blocked placement must retain its diagnostic." }
         val affected =
             if (code == ViolationCode.SHIPPING_CAPACITY_EXCEEDED) listOf(destination.value)
-            else emptyList()
+            else listOfNotNull(intermediate?.value)
         throw RuleViolation(code, entityIds = affected)
     }
 }
@@ -113,7 +117,12 @@ object BoardPlacementRules {
         poolTokens: Int,
         routes: List<ExpansionRoute>,
     ): PlacementAssessment {
-        if (routes.isEmpty()) return PlacementAssessment(ViolationCode.UNREACHABLE_PROVINCE)
+        if (routes.isEmpty()) {
+            val intermediate =
+                ExpansionReach.blockedCaravanIntermediate(context, player, destination)
+            return if (intermediate == null) PlacementAssessment(ViolationCode.UNREACHABLE_PROVINCE)
+            else PlacementAssessment(ViolationCode.CARAVAN_INTERMEDIATE_OCCUPIED, intermediate)
+        }
         poolBlocker(addedTokens, poolTokens)?.let {
             return PlacementAssessment(it)
         }

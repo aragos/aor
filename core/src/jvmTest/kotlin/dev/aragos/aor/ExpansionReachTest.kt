@@ -394,12 +394,13 @@ class ExpansionReachTest {
     }
 
     @Test
-    fun caravanMustDefeatAFullWhiteIntermediateProvinceFirst() {
+    fun legacyCaravanMustDefeatAFullWhiteIntermediateProvinceFirst() {
         val context =
             context(
-                advances = setOf(AdvanceId.CARAVAN),
-                board = BoardState().placeMarker(id("florence"), genoa, PieceSide.WHITE).board,
-            )
+                    advances = setOf(AdvanceId.CARAVAN),
+                    board = BoardState().placeMarker(id("florence"), genoa, PieceSide.WHITE).board,
+                )
+                .copy(onlyDarkPiecesBlockCaravan = false)
 
         val failure =
             assertFailsWith<RuleViolation> {
@@ -412,6 +413,18 @@ class ExpansionReachTest {
             }
 
         assertThat(failure.code).isEqualTo(ViolationCode.CARAVAN_INTERMEDIATE_OCCUPIED)
+    }
+
+    @Test
+    fun caravanCanPassThroughAnOpponentsWhiteDominationMarker() {
+        val context =
+            context(
+                advances = setOf(AdvanceId.CARAVAN),
+                board = BoardState().placeMarker(id("florence"), genoa, PieceSide.WHITE).board,
+            )
+
+        assertThat(ExpansionReach.routesTo(context, venice, id("rome")))
+            .contains(ExpansionRoute.Caravan(id("venice"), id("florence")))
     }
 
     @Test

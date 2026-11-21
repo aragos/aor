@@ -120,15 +120,19 @@ export function PlayerOverview({snapshot}: {snapshot: Snapshot}) {
                         {player.capital && <span className="player-person" title={player.name}>{person}</span>}</span>
                         {player.id === snapshot.viewerId && <small>{t('table.you')}</small>}</span>
                     <span className="player-money"><span title={t('game.cash')} aria-label={`${t('game.cash')}: $${player.cash}`}><TableIcon kind="cash"/> <b>${player.cash}</b></span>
-                        <span className="income-value" title={t('table.income')} aria-label={`${t('table.income')}: ${player.income ? `$${player.income.ordinary}` : t('table.unavailable')}`}><TableIcon kind="income"/> <b>{player.income ? `$${player.income.ordinary}` : '—'}</b><HelpLink topic="income-track" label={t('reference.income-track')}/></span>
+                        <span className="income-value"><HelpLink topic="income-track" compact={false} label={t('reference.income-track')}>
+                            <TableIcon kind="income"/> <b>{player.income ? `$${player.income.ordinary}` : '—'}</b>
+                        </HelpLink></span>
                         <span className="player-advance-count" title={t('game.advances')} aria-label={`${t('game.advances')}: ${player.advances.length}`}><TableIcon kind="advances"/> <b>{player.advances.length}</b></span></span>
-                    <span className="player-stats"><span title={t('game.misery')}><TableIcon kind="misery"/> <MiseryBox value={player.misery} track={snapshot.game.catalog?.miseryTrack}/><HelpLink topic="misery-track" label={t('table.miseryTrack')}/></span>
+                    <span className="player-stats"><HelpLink topic="misery-track" compact={false} label={t('table.miseryTrack')}>
+                        <TableIcon kind="misery"/> <MiseryBox value={player.misery} track={snapshot.game.catalog?.miseryTrack}/>
+                    </HelpLink>
                         <span title={t('game.cards')}><TableIcon kind="cards"/> {player.handCount}</span>
-                        <span title={t('game.ships')}><TableIcon kind="ship"/> {fleet}<HelpLink topic="shipping-track" label={t('table.shippingTrack')}/></span></span>
+                        <HelpLink topic="shipping-track" compact={false} label={t('table.shippingTrack')}><TableIcon kind="ship"/> {fleet}</HelpLink></span>
                     <span className="player-status-row">
                         <span className="player-score"><span>{t('game.score')}</span><b>{scoreValue}</b></span>
-                        {orderBox !== undefined && <span className="player-turn-order">{t('order.box', {box: orderBox})}
-                            <HelpLink topic="turn-order" label={t('reference.turnOrder')}/></span>}
+                        {orderBox !== undefined && <span className="player-turn-order"><HelpLink topic="turn-order" compact={false}
+                            label={t('reference.turnOrder')}>{t('order.box', {box: orderBox})}</HelpLink></span>}
                         {player.poolAvailable && <span className="player-pool" title={t('table.poolTokens')} aria-label={`${t('table.poolTokens')}: ${player.poolTokens}`}><TableIcon kind="token"/><b>{player.poolTokens}</b><small>{t('table.poolTokens')}</small></span>}
                         {!finished && submitted && <span className="player-status">{status}</span>}
                     </span>
