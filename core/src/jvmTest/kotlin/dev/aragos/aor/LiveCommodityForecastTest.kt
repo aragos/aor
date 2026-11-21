@@ -155,7 +155,7 @@ class LiveCommodityForecastTest {
         assertThat(forecast.adjustments)
             .containsExactly(CommodityAdjustment.SHORTAGE, CommodityAdjustment.SURPLUS)
             .inOrder()
-        assertThat(CardRules.commodityPayment(before.cardContext(), Commodity.CLOTH).payments[p1])
+        assertThat(CardRules.commodityPayment(before.cardContext, Commodity.CLOTH).payments[p1])
             .isEqualTo(45)
     }
 

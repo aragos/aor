@@ -7,6 +7,7 @@ import {browserLocalPersistence, createUserWithEmailAndPassword, getAuth, Google
 import type {Auth, User} from 'firebase/auth';
 import {errorCode, request, setAuthentication} from './api';
 import type {Account, ApplicationConfig, CreatedGame, GamePage, GameSummary, Session} from './api';
+import {AutomatedOpponents} from './AutomatedOpponents';
 import {ChoiceButtons} from './DecisionControls';
 import {defaultVariants, migrateVariants, validVariants, Variants} from './Variants';
 import {useStoredSetting, isUndoPolicy, isGameFilter} from './preferences';
@@ -147,9 +148,11 @@ function VerifyEmail({user, refresh}: {user: User; refresh: () => Promise<void>}
     </main>;
 }
 
-function RegisteredGameForm({me}: {me: Account}) {
+function RegisteredGameForm({me, automataVersion}: {me: Account; automataVersion?: string}) {
     const [name, setName] = useState('');
     const [players, setPlayers] = useState<Account[]>([me]);
+    const [botCount, setBotCount] = useState(0);
+    const seatCount = players.length + botCount;
     const [query, setQuery] = useState('');
     const [matches, setMatches] = useState<Account[]>([]);
     const [variants, setVariants] = useStoredSetting('variants', defaultVariants, validVariants, migrateVariants);
@@ -166,14 +169,14 @@ function RegisteredGameForm({me}: {me: Account}) {
         return () => {current = false; clearTimeout(timer);};
     }, [query]);
     function addPlayer(player: Account) {
-        if (busy || players.length >= 6) return;
+        if (busy || seatCount >= 6) return;
         setPlayers(current => current.some(chosen => chosen.id === player.id) ? current : [...current, player]);
         setQuery('');
     }
     async function create(event: FormEvent) {
         event.preventDefault(); setBusy(true); setError('');
         try {
-            const result = await request<CreatedGame>('/api/games', undefined, {name: name.trim(), players: players.map(player => player.id), options: variants, undoPolicy});
+            const result = await request<CreatedGame>('/api/games', undefined, {name: name.trim(), players: players.map(player => player.id), bots: Array.from({length: botCount}, () => ({})), options: variants, undoPolicy});
             window.location.assign(`/games/${result.gameId}`);
         } catch (failure) {setError(message(failure)); setBusy(false);}
     }
@@ -181,19 +184,20 @@ function RegisteredGameForm({me}: {me: Account}) {
         {!me.mayCreateGames ? <p>{t('hosted.an-administrator-must-approve-your')}</p> : <form onSubmit={create}>
             <label htmlFor="game-name">{t('create.gameName')}</label>
             <input id="game-name" value={name} onChange={event => setName(event.target.value)} maxLength={80} required disabled={busy}/>
-            <h2>{t('hosted.players')}</h2><p>{t('hosted.choose-36-registered-players-including')}</p>
+            <h2>{t('hosted.players')}</h2><p>{t('hosted.choose-players')}</p>
             <ul className="player-directory">{players.map(player => <li key={player.id}><span><strong>@{player.handle}</strong></span>
                 {player.id !== me.id && <button type="button" className="secondary" disabled={busy} onClick={() => setPlayers(players.filter(candidate => candidate.id !== player.id))}>{t('hosted.remove')}</button>}</li>)}</ul>
             <label>{t('hosted.find-a-player-by-handle')}<input type="search" value={query} maxLength={60} onChange={event => setQuery(event.target.value)}/></label>
             {query.trim().length >= 2 && <ul className="player-directory" aria-label={t('hosted.matching-players')}>{matches.filter(player => !players.some(chosen => chosen.id === player.id)).map(player => <li key={player.id}>
-                <button type="button" className="player-handle" disabled={busy || players.length >= 6} onClick={() => addPlayer(player)}>@{player.handle}</button>
-                <button type="button" className="secondary" disabled={busy || players.length >= 6} onClick={() => addPlayer(player)}>{t('hosted.add')}</button>
+                <button type="button" className="player-handle" disabled={busy || seatCount >= 6} onClick={() => addPlayer(player)}>@{player.handle}</button>
+                <button type="button" className="secondary" disabled={busy || seatCount >= 6} onClick={() => addPlayer(player)}>{t('hosted.add')}</button>
             </li>)}</ul>}
+            <AutomatedOpponents count={botCount} onChange={setBotCount} humanCount={players.length} version={automataVersion} disabled={busy}/>
             <details className="creation-settings"><summary>{t('table.configuration')}</summary>
             <Variants value={variants} onChange={setVariants} disabled={busy}/>
             <p>{t('history.policy')} <HelpLink topic="history" label="Undo policies"/></p><ChoiceButtons label={t('history.policy')} value={undoPolicy} onChange={setUndoPolicy} disabled={busy} choices={['regular-turn', 'competitive', 'friendly-turn', 'linear-game'].map(value => ({value, label: t(`undoPolicy.${value}`)}))}/>
             {undoPolicy === 'linear-game' && <p className="small">{t('history.linearDescription')}</p>}</details>
-            <Problem value={error}/><button disabled={busy || players.length < 3}>{busy ? t('hosted.creating') : t('hosted.create-game')}</button>
+            <Problem value={error}/><button disabled={busy || seatCount < 3}>{busy ? t('hosted.creating') : t('hosted.create-game')}</button>
         </form>}
     </details>;
 }
@@ -276,7 +280,7 @@ function GameRow({game}: {game: GameSummary}) {
         <span className="game-row-stage">{game.stage && t(`stage.${game.stage}`)}</span></>;
 }
 
-export function Dashboard({me}: {me: Account}) {
+export function Dashboard({me, automataVersion}: {me: Account; automataVersion?: string}) {
     const [hasTurn, setHasTurn] = useState(false);
     useTurnFavicon(hasTurn);
     useEffect(() => startPolling({intervalMs: 30000, backgroundIntervalMs: 30000,
@@ -363,7 +367,7 @@ export function Dashboard({me}: {me: Account}) {
                     {page.nextCursor && <button className="secondary" disabled={busy} onClick={() => setCursor(page.nextCursor)}>{t('hosted.next-page')}</button>}</div>
             </div>
         </section>
-        <RegisteredGameForm me={me}/>
+        <RegisteredGameForm me={me} automataVersion={automataVersion}/>
         {all && <AdminPlayers/>}
         <footer className="privacy-footer"><a href="/privacy.html">{t('hosted.privacy-policy')}</a></footer>
     </main>;
@@ -414,5 +418,5 @@ export default function HostedApp({config, game}: {config: ApplicationConfig; ga
             : error ? <main className="landing panel"><Problem value={error}/><button onClick={() => {void refresh();}}>{t('hosted.retry')}</button></main>
             : !session?.emailVerified ? <VerifyEmail user={user} refresh={() => refresh()}/>
             : !session.account ? <Register refresh={() => refresh()}/>
-            : <div key={user.uid}>{game ?? <Dashboard me={session.account}/>}</div>}</AccountContext.Provider>;
+            : <div key={user.uid}>{game ?? <Dashboard me={session.account} automataVersion={config.automataVersion}/>}</div>}</AccountContext.Provider>;
 }
