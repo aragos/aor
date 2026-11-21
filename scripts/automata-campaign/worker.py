@@ -57,6 +57,7 @@ def execute(root, job, host):
         if remaining <= 0:
             raise TimeoutError("The campaign allocation deadline passed.")
         atomic(directory / "spec.json", canonical(dict(job, seconds=min(remaining, 43200))))
+        evaluator = bundle / "reference" if job["final"] and "reference.json" in manifest else bundle
         with (directory / "java.log").open("ab") as log:
             subprocess.run(
                 [
@@ -66,7 +67,7 @@ def execute(root, job, host):
                     "-XX:+UseParallelGC",
                     "-XX:ParallelGCThreads=2",
                     "-cp",
-                    str(bundle / "lib" / "*"),
+                    str(evaluator / "lib" / "*"),
                     "dev.aragos.aor.training.TrainingMainKt",
                     "checkpoint-bank",
                     str(bundle / "assets"),

@@ -80,12 +80,34 @@ def prepare(args):
             for suffix in ("*.py", "*.java", "*.mjs"):
                 for source in HERE.glob(suffix):
                     shutil.copyfile(source, staged / source.name)
-            shutil.copytree(project / "server/build/install/server/lib", staged / "browser/lib")
-            shutil.copytree(
-                project / "ai/build/dist/js/productionLibrary",
-                staged / "browser/js",
-                ignore=shutil.ignore_patterns("*.map"),
-            )
+            reference = args.reference_bundle
+            if reference is None:
+                shutil.copytree(project / "server/build/install/server/lib", staged / "browser/lib")
+                shutil.copytree(
+                    project / "ai/build/dist/js/productionLibrary",
+                    staged / "browser/js",
+                    ignore=shutil.ignore_patterns("*.map"),
+                )
+            else:
+                reference_manifest = load(reference / "manifest.json")
+                for name, digest in reference_manifest.items():
+                    if not name.startswith(("lib/", "browser/")):
+                        continue
+                    contents = (reference / name).read_bytes()
+                    if hashlib.sha256(contents).hexdigest() != digest:
+                        raise ValueError(f"Reference package integrity failure for {name}.")
+                    target = staged / ("reference" if name.startswith("lib/") else "") / name
+                    target.parent.mkdir(parents=True, exist_ok=True)
+                    target.write_bytes(contents)
+                for name in (
+                    "reference/lib/core-jvm.jar",
+                    "reference/lib/training.jar",
+                    "browser/js",
+                    "browser/lib",
+                ):
+                    if not (staged / name).exists():
+                        raise ValueError(f"The release reference package is missing {name}.")
+                save(staged / "reference.json", {"bundle": identity(reference_manifest)})
             save(
                 staged / "starting.json",
                 {str(c): "market" if c in args.market else "shipped" for c in COUNTS},
@@ -107,6 +129,13 @@ def prepare(args):
         raise ValueError(
             "The prepared package has a different starting roster. Choose a fresh output directory."
         )
+    if args.reference_bundle is not None:
+        expected_reference = identity(load(args.reference_bundle / "manifest.json"))
+        if (
+            "reference.json" not in manifest
+            or load(bundle / "reference.json")["bundle"] != expected_reference
+        ):
+            raise ValueError("The prepared league has a different release reference.")
     args.remote_root = f"{args.remote_base.rstrip('/')}/{identity(manifest)[:20]}/{root.name}"
     try:
         remote(args, ["mkdir", "-p", args.remote_root + "/bundle"])
@@ -190,12 +219,11 @@ class Campaign:
         )
         # One shard per host even in the pilot. Host assignment changes neither seats nor chance.
         chunks = []
-        step = 1 if self.pilot else (2 if futures else 4)
+        step = min(2 if futures else 4, math.ceil(repeats / 2))
         for offset in range(0, repeats, step):
             chunks.append(dict(common, first=first + offset, repeats=min(step, repeats - offset)))
 
-        def run(item):
-            index, job = item
+        def run(job, primary):
             key = identity(job)
             cached = self.root / "receipts" / (key + ".gz")
             expected = number * (4 if final else 2) * job["repeats"]
@@ -213,7 +241,7 @@ class Campaign:
 
             if cached.exists():
                 return validate(cached.read_bytes())
-            hosts = ("mac", "callisto") if index % 2 == 0 else ("callisto", "mac")
+            hosts = (primary, "callisto" if primary == "mac" else "mac")
             maximum = expected * (4 * futures if futures else 2)
             for attempt in range(3):
                 host = hosts[attempt % 2]
@@ -255,32 +283,51 @@ class Campaign:
                         save(self.root / "state.json", self.state)
                     return rows
 
+        # Let each host claim the next available shard. Restore seed-block order before fitting.
+        pending = iter(enumerate(chunks))
+
+        def drain(host):
+            completed = []
+            while True:
+                with self.guard:
+                    item = next(pending, None)
+                if item is None:
+                    return completed
+                index, job = item
+                completed.append((index, run(job, host)))
+
         with ThreadPoolExecutor(max_workers=2) as pool:
-            rows = [r for shard in pool.map(run, enumerate(chunks)) for r in shard]
+            completed = [item for host in pool.map(drain, self.locks) for item in host]
+        rows = [row for _, shard in sorted(completed) for row in shard]
         if len({r["seed"] for r in rows}) != len(rows):
             raise ValueError("Repeated world across shards in one comparison.")
         return rows
 
     def fit(self, rows):
+        payload = canonical(rows)
+
+        def cpu():
+            return subprocess.run(
+                [self.args.cpu_python, self.root / "bundle/fit.py", "cpu"],
+                input=payload,
+                stdout=subprocess.PIPE,
+                check=True,
+                timeout=900,
+            ).stdout
+
+        def cuda():
+            return remote(
+                self.args,
+                [self.args.gpu_python, self.args.remote_root + "/bundle/fit.py", "cuda"],
+                payload,
+                900,
+            )
+
+        first, fallback = (cpu, cuda) if self.args.fit_first == "cpu" else (cuda, cpu)
         try:
-            payload = canonical(rows)
-            return json.loads(
-                remote(
-                    self.args,
-                    [self.args.gpu_python, self.args.remote_root + "/bundle/fit.py", "cuda"],
-                    payload,
-                    900,
-                )
-            )
+            return json.loads(first())
         except (OSError, subprocess.SubprocessError):
-            return json.loads(
-                subprocess.run(
-                    [self.args.cpu_python, self.root / "bundle/fit.py", "cpu"],
-                    input=canonical(rows),
-                    stdout=subprocess.PIPE,
-                    check=True,
-                ).stdout
-            )
+            return json.loads(fallback())
 
     def export(self, count, policy, prefix=""):
         asset = load(self.root / "bundle/assets" / FILES[count])
@@ -493,12 +540,17 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("action", choices=("prepare", "pilot", "run"))
     parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument(
+        "--reference-bundle", type=Path,
+        help="Frozen release-matched evaluator and browser package for a new campaign.",
+    )
     parser.add_argument("--callisto", default="aragos@192.168.86.44")
     parser.add_argument("--remote-base", default="/home/aragos/aor-worker/current-rules-leagues")
     parser.add_argument(
         "--gpu-python",
         default="/home/aragos/aor-worker/venvs/purchase-value-cuda-20261111/bin/python",
     )
+    parser.add_argument("--fit-first", choices=("cpu", "cuda"), default="cpu")
     cpu_venv = Path.home() / "Projects/aor/.aor-training/venvs/purchase-cpu-20261111/bin/python"
     parser.add_argument(
         "--cpu-python", default=str(cpu_venv) if cpu_venv.is_file() else sys.executable

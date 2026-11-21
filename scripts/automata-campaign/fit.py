@@ -6,6 +6,29 @@ import sys
 import torch
 
 
+def tensors(groups, device):
+    rows = [alt for group in groups for alt in group]
+    return (
+        torch.tensor([a["inputs"] for a in rows], dtype=torch.float64, device=device),
+        torch.tensor([a["gain"] for a in rows], dtype=torch.float64, device=device),
+    )
+
+
+def grouped_yields(weights, groups, device):
+    x, y = tensors(groups, device)
+    # Pad the index only. Masked entries cannot win, even when every legal score is negative.
+    width = max(map(len, groups))
+    offsets = []
+    offset = 0
+    for group in groups:
+        offsets.append([*range(offset, offset + len(group)), *([-1] * (width - len(group)))])
+        offset += len(group)
+    indexes = torch.tensor(offsets, device=device)
+    scores = (x @ weights.T)[indexes].masked_fill((indexes < 0).unsqueeze(-1), -torch.inf)
+    values, best = scores.max(dim=1)
+    return torch.where(values > 0.02, y[indexes.gather(1, best)], 0.0)
+
+
 def fit(origins, device):
     # Entire origins (all alternatives and paired futures) share a split.
     groups = [[alt for alt in r["alternatives"]] for r in origins if r["alternatives"]]
@@ -15,14 +38,7 @@ def fit(origins, device):
     for idx, group in enumerate(groups):
         (test if idx % 5 == 0 else validation if idx % 5 == 1 else training).append(group)
 
-    def tensors(groups):
-        rows = [alt for group in groups for alt in group]
-        return (
-            torch.tensor([a["inputs"] for a in rows], dtype=torch.float64, device=device),
-            torch.tensor([a["gain"] for a in rows], dtype=torch.float64, device=device),
-        )
-
-    x, y = tensors(training)
+    x, y = tensors(training, device)
     penalties = torch.tensor([0.001, 0.01, 0.1, 1.0], dtype=x.dtype, device=device)
     eye = torch.eye(x.size(1), device=device, dtype=x.dtype)
     weights = (
@@ -34,21 +50,9 @@ def fit(origins, device):
         .clamp(-4, 4)
     )
 
-    def yields(weights, groups):
-        x, y = tensors(groups)
-        scores = x @ weights.T
-        outcomes = []
-        offset = 0
-        for group in groups:
-            end = offset + len(group)
-            values, indexes = scores[offset:end].max(dim=0)
-            outcomes.append(torch.where(values > 0.02, y[offset + indexes], 0.0))
-            offset = end
-        return torch.stack(outcomes)
-
-    performance = yields(weights, validation).mean(dim=0)
+    performance = grouped_yields(weights, validation, device).mean(dim=0)
     best = int(performance.argmax())
-    held = yields(weights[best : best + 1], test)[:, 0]
+    held = grouped_yields(weights[best : best + 1], test, device)[:, 0]
     gain = float(held.mean())
     se = float(held.std() / len(held) ** 0.5) if len(held) > 1 else 1.0
     return dict(

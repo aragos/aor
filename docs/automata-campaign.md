@@ -7,16 +7,24 @@ retain their saved controller version. Use a new game to playtest a new controll
 
 ## Prepare and run
 
-From the feature checkout, build the JVM simulator and the release-mode browser selector. The Mac
+From the feature checkout, build the JVM simulator. The Mac
 coordinator needs Node, JDK 21 or later, Python, SSH and rsync. Callisto needs Java, Python and its
 existing CUDA PyTorch environment. The prepared bundle pins the evaluator, assets, scripts,
-browser comparator and starting policies by SHA-256. Preparation stages the workers. The
+browser comparator and starting policies by SHA-256. For optimized discovery, pass the frozen
+release qualification bundle as the reference. Its original JVM evaluator runs every sealed final
+and its browser and JVM selectors check the exported models. Preparation stages both evaluators. The
 seven-day clock starts when the coordinator first enters `run`.
 
 ```sh
-./gradlew :training:installDist :server:installDist :ai:jsBrowserProductionLibraryDistribution
-python3 scripts/automata-campaign/campaign.py prepare --market 3 4 5 6 --output .aor-training/seven-day-current-rules
+./gradlew :training:installDist
+python3 scripts/automata-campaign/campaign.py prepare --market 3 4 5 6 \
+  --reference-bundle ../current-rules-automata-playtest/.aor-training/seven-day-current-rules/bundle \
+  --output .aor-training/seven-day-current-rules
 ```
+
+A fresh standalone pilot can omit the reference after also building
+`:server:installDist` and `:ai:jsBrowserProductionLibraryDistribution`. It then uses its own evaluator
+for every stage.
 
 The prepared package can run independently of subsequent builds and source edits. To start or
 resume this specific campaign, from the same checkout use:
@@ -32,15 +40,20 @@ Override the worker address or PyTorch interpreters with `--callisto`, `--gpu-py
 
 ## Games, workers and selection
 
-The Mac runs six simulation workers and Callisto ten. Each has a 6 GiB JVM heap. The Mac keeps
-10 GiB of free disk and Callisto 20 GiB. The RTX 4090 fits a bounded expansion scorer from
-matched terminal continuations. Ordinary game execution and online inference run on CPUs.
-A local PyTorch interpreter can fit the scorer during a GPU outage.
+The Mac runs six simulation workers and Callisto ten. Each host takes the next available shard. Each has
+a 6 GiB JVM heap. The Mac keeps 10 GiB of free disk and Callisto 20 GiB. The coordinator fits a bounded expansion scorer from
+matched terminal continuations. The local CPU is the first choice for this twelve-input scorer.
+The RTX 4090 takes over if that interpreter is unavailable. Use `--fit-first cuda` to reverse
+the order. Validation scores the legal alternatives from many origins in one batch, keeping the
+original strict adoption threshold and tie order. Ordinary game execution and online inference run
+on CPUs.
 
 For each table size, challengers vary market-marker income, commodity opportunity and initiative
 together. On alternate generations the learner samples at least 4,096 originating worlds, then
 compares up to three legal alternatives to the ordinary expansion. It attempts four matched
 continuations for each choice at the sampled position. Each origin has one sampled hidden world.
+The simulator retains its immutable state at the selected expansion and plays each continuation from there, using the same future chance seed
+and absolute decision index as a complete replay.
 All its alternatives and continuations stay in the same partition. Some games never present
 an eligible alternative. A correction enters whole-game screening only if it improves held-out
 terminal win share. The trained coefficients fit in a versioned browser model.
