@@ -45,7 +45,9 @@ Paths are relative to [web/src](../web/src/).
   shared commodity cards switch within one payout popup. Projected live warnings explain voided cards
   and legal no-target plays that consume a card without effect.
 - Keep zoom/Fit/help beside workspace tabs, hiding them when space is insufficient; keyboard/gestures
-  remain. No parallel map panel. Public remaining-card lookup lists introduced cards not publicly played or
+  remain. The desktop expand control gives the map and hand the full width and hides the action pane
+  until the map is minimized or another workspace opens. Preserve action drafts through the toggle.
+  No parallel map panel. Public remaining-card lookup lists introduced cards not publicly played or
   discarded (including hidden hands/losses); recurring cards reset next shuffle, squares stay excluded.
   The header's remaining-card text opens this lookup; entries open existing card/payout details and
   return without changing drafts. Keep draw-pile size separate and forecasts distinct from payouts.
