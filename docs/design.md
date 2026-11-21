@@ -132,7 +132,10 @@ epoch until explicit resume. Completion and closure stop bots. Creator abandonme
 separate bot consent. Each human still consents.
 
 [The worker](../web/src/ai/botWorker.ts) selects one hashed, immutable checkpoint model by
-policy version and player count. The three published assets total 304 KiB, with 90–123 KiB
+policy version and player count. The November 21 Hard policy uses the same assets as November 20.
+Its controller prices expected market income and adjusts initiative by table size and opening.
+Existing Hard seats keep their recorded controller on reload and continue receiving initiative and
+finish quotes. The three published assets total 304 KiB, with 90–123 KiB
 uncompressed downloaded once per applicable worker (HTTP caching reuses the versioned URL).
 Startup, setup, human-only games and read-only visits do not initialize the worker or fetch the
 models. Replays use recorded commands and outcomes. Keep older policy files available while

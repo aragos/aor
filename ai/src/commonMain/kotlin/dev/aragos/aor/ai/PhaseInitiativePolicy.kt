@@ -64,6 +64,7 @@ data class PhaseInitiativeInput(
     val buyingCard: Double,
     val earlyCompetition: Double,
     val secureMarkets: Double,
+    val exposedMarkerIncome: Double = 0.0,
 )
 
 /** Price earlier and later positions from the acting seat's hand and the public board. */
@@ -160,6 +161,11 @@ object PhaseInitiativePolicy {
             buyingCard = cardNeed,
             earlyCompetition = competition,
             secureMarkets = (exposedPayout / 24.0).coerceAtMost(1.0),
+            exposedMarkerIncome =
+                view.catalog?.incomeTrack?.let { track ->
+                    val markers = view.board.count { it.id in exposed && it.marker?.owner == actor }
+                    ((track[1] - track[0]) * markers / 24.0).coerceAtMost(1.0)
+                } ?: 0.0,
         )
     }
 
@@ -169,6 +175,7 @@ object PhaseInitiativePolicy {
         ordinary: String,
         seed: Int,
         config: PhaseInitiativeConfig,
+        secureMarkerWeight: Double = 0.0,
     ): String {
         val bias =
             config.lowBidResponse?.takeIf { it.appliesTo(input.bids) }?.earlyBias
@@ -178,7 +185,9 @@ object PhaseInitiativePolicy {
                 config.earlyPayout * input.earlyPayout +
                 config.buyingCard * input.buyingCard +
                 config.earlyCompetition * input.earlyCompetition
-        val later = config.secureMarkets * input.secureMarkets
+        val later =
+            config.secureMarkets * input.secureMarkets +
+                secureMarkerWeight * input.exposedMarkerIncome
         return InitiativePolicy.bid(
             input.bids,
             actor,

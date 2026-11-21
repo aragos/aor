@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.node.ObjectNode
 import com.google.common.truth.Truth.assertThat
 import dev.aragos.aor.ai.BOT_POLICY_VERSION
 import dev.aragos.aor.ai.BotDifficulty
+import dev.aragos.aor.ai.PREVIOUS_HARD_AUTOMATA_VERSION
 import java.nio.file.Files
 import java.util.UUID
 import java.util.concurrent.Callable
@@ -37,6 +38,44 @@ class BotAutomationTest(private val postgres: Boolean) {
                 .containsExactly(BotDifficulty.NORMAL, BotDifficulty.HARD)
                 .inOrder()
             assertThat(snapshot.automation?.canControl).isTrue()
+        }
+
+    @Test
+    fun storedNovember20HardSeatCanResumeAndSubmitItsSealedBid() =
+        AutomationFixture(postgres, version = PREVIOUS_HARD_AUTOMATA_VERSION).use { fixture ->
+            val service = fixture.reopened()
+            val gameId = fixture.game.gameId
+            val work =
+                BotAutomation.control(
+                    service,
+                    gameId,
+                    fixture.access(),
+                    "claim",
+                    fixture.runnerId,
+                    expectedEpoch = 0,
+                    now = 1000,
+                )
+            val job = work.observations.first()
+            BotAutomation.submit(
+                service,
+                gameId,
+                fixture.access(),
+                fixture.runnerId,
+                work.epoch,
+                work.revision,
+                job.submissionVersion,
+                job.seat,
+                job.decisionId,
+                "bid-capital 10",
+                UUID.randomUUID().toString(),
+                now = 1100,
+            )
+
+            val stored = fixture.reopened().store.read(gameId)
+            assertThat(job.policyVersion).isEqualTo(PREVIOUS_HARD_AUTOMATA_VERSION)
+            assertThat(stored.bots[job.seat]?.policyVersion)
+                .isEqualTo(PREVIOUS_HARD_AUTOMATA_VERSION)
+            assertThat(stored.pendingBids.keys).contains(job.seat)
         }
 
     @Test
@@ -533,6 +572,7 @@ private class AutomationFixture(
     humans: Int = 1,
     bots: Int = 2,
     policy: UndoPolicy = UndoPolicy.LINEAR_GAME,
+    version: String = BOT_POLICY_VERSION,
 ) : AutoCloseable {
     private val directory = Files.createTempDirectory("aor-bot-test-")
     private val database = if (postgres) PostgresFixture() else null
@@ -546,9 +586,10 @@ private class AutomationFixture(
                             seat to
                                 bot.copy(
                                     difficulty =
-                                        if (index == 0) BotDifficulty.NORMAL
+                                        if (index == 0 && version == BOT_POLICY_VERSION)
+                                            BotDifficulty.NORMAL
                                         else BotDifficulty.HARD,
-                                    policyVersion = BOT_POLICY_VERSION,
+                                    policyVersion = version,
                                 )
                         }
                         .toMap()
