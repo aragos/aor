@@ -134,12 +134,16 @@ edits retain the runner and its pause state. Other edits and rewinds pause bots 
 epoch until explicit resume. Completion and closure stop bots. Creator abandonment records
 separate bot consent. Each human still consents.
 
-The creator can enable phase pauses in Game options. The server pauses the runner atomically
-when the table completes a phase containing a committed automated decision in public Activity.
-Sealed decisions count on reveal, and ties belong to their bidding or token-purchase phase.
-Urban Ascendancy card purchases, passes omitted from Activity, and automatic outcomes do not
-trigger a pause. Human play remains available. The phase pause and setting survive reload;
-resuming clears the pause and keeps the setting. Older saves default to continuous play.
+The creator can opt into phase pauses during setup or in Game options. The server pauses the
+runner when an automated seat finishes its own phase activity containing a decision in public
+Activity. A shared sealed batch counts once, on reveal. Urban Ascendancy card purchases, passes
+omitted from Activity, and automatic outcomes do not trigger a pause. Resume is in Activity.
+A successful human game command or turning the setting off also releases a review pause. Manual
+and history-edit pauses require explicit resume. The setting and pause survive reload. Older saves
+can omit the reviewed seat, and games without this setting default to continuous play. When a qualifying
+activity hands off to pending authority outcomes in the next turn phase, its revision commits the
+action and holds those outcomes. Resume appends the outcomes in a new authority revision. This
+keeps expansion bonus draws and analogous next-phase draws or rolls out of Activity until resume.
 
 [The worker](../web/src/ai/botWorker.ts) selects one hashed, immutable checkpoint model by
 policy version and player count. The November 21 Hard policy uses the same assets as November 20.

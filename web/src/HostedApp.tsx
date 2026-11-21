@@ -182,6 +182,7 @@ function RegisteredGameForm({me, automataVersion}: {me: Account; automataVersion
     const [name, setName] = useState('');
     const [players, setPlayers] = useState<Account[]>([me]);
     const [botCount, setBotCount] = useState(0);
+    const [pauseAfterPhase, setPauseAfterPhase] = useState(false);
     const seatCount = players.length + botCount;
     const [query, setQuery] = useState('');
     const [matches, setMatches] = useState<Account[]>([]);
@@ -206,7 +207,7 @@ function RegisteredGameForm({me, automataVersion}: {me: Account; automataVersion
     async function create(event: FormEvent) {
         event.preventDefault(); setBusy(true); setError('');
         try {
-            const result = await request<CreatedGame>('/api/games', undefined, {name: name.trim(), players: players.map(player => player.id), bots: Array.from({length: botCount}, () => ({})), options: variants, undoPolicy});
+            const result = await request<CreatedGame>('/api/games', undefined, {name: name.trim(), players: players.map(player => player.id), bots: Array.from({length: botCount}, () => ({})), pauseAfterPhase: botCount > 0 && pauseAfterPhase, options: variants, undoPolicy});
             window.location.assign(`/games/${result.gameId}`);
         } catch (failure) {setError(message(failure)); setBusy(false);}
     }
@@ -222,7 +223,8 @@ function RegisteredGameForm({me, automataVersion}: {me: Account; automataVersion
                 <button type="button" className="player-handle" disabled={busy || seatCount >= 6} onClick={() => addPlayer(player)}>@{player.handle}</button>
                 <button type="button" className="secondary" disabled={busy || seatCount >= 6} onClick={() => addPlayer(player)}>{t('hosted.add')}</button>
             </li>)}</ul>}
-            <AutomatedOpponents count={botCount} onChange={setBotCount} humanCount={players.length} version={automataVersion} disabled={busy}/>
+            <AutomatedOpponents count={botCount} onChange={setBotCount}
+                pauseAfterPhase={pauseAfterPhase} onPauseAfterPhaseChange={setPauseAfterPhase} humanCount={players.length} version={automataVersion} disabled={busy}/>
             <details className="creation-settings"><summary>{t('table.configuration')}</summary>
             <Variants value={variants} onChange={setVariants} disabled={busy}/>
             <p>{t('history.policy')} <HelpLink topic="history" label="Undo policies"/></p><ChoiceButtons label={t('history.policy')} value={undoPolicy} onChange={setUndoPolicy} disabled={busy} choices={['regular-turn', 'competitive', 'friendly-turn', 'linear-game'].map(value => ({value, label: t(`undoPolicy.${value}`)}))}/>

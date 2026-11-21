@@ -166,7 +166,7 @@ export type BotDifficulty = 'EASY' | 'NORMAL' | 'HARD';
 export interface BotAutomation {
     players: {id: string; name: string; difficulty: BotDifficulty; policyVersion: string}[];
     canControl: boolean; paused: boolean; epoch: number;
-    pauseAfterPhase: boolean; pausedAfterPhase: string | null;
+    pauseAfterPhase: boolean; pausedAfterPhase: string | null; pausedAfterPlayer: string | null;
 }
 export interface BotJob {
     seat: string; difficulty: BotDifficulty; seed: number; decisionId: string;

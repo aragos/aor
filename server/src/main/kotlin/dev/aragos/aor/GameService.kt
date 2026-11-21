@@ -88,6 +88,7 @@ class GameService(
         undoPolicy: UndoPolicy = UndoPolicy.REGULAR_TURN,
         name: GameName = GameName.DEFAULT,
         bots: List<AutomatedPlayerRequest> = emptyList(),
+        pauseAfterPhase: Boolean = false,
     ): CreatedGame {
         val normalized = names.map(String::trim) + bots.map(AutomatedPlayerRequest::name)
         if (names.isEmpty() || names.size + bots.size !in 3..6) {
@@ -129,7 +130,10 @@ class GameService(
                 .copy(
                     name = name,
                     bots = botSeats(players.drop(names.size)),
-                    botRunner = BotRunnerState().takeIf { bots.isNotEmpty() },
+                    botRunner =
+                        BotRunnerState(pauseAfterPhase = pauseAfterPhase).takeIf {
+                            bots.isNotEmpty()
+                        },
                 )
         )
         return CreatedGame(
@@ -158,6 +162,7 @@ class GameService(
         policy: UndoPolicy,
         name: GameName = GameName.DEFAULT,
         bots: List<AutomatedPlayerRequest> = emptyList(),
+        pauseAfterPhase: Boolean = false,
     ): CreatedGame {
         if (
             players.size + bots.size !in 3..6 ||
@@ -189,7 +194,10 @@ class GameService(
                     name = name,
                     memberships = seats.associate { (seat, account) -> seat to account.id.value },
                     bots = botSeats(header.players.drop(players.size)),
-                    botRunner = BotRunnerState().takeIf { bots.isNotEmpty() },
+                    botRunner =
+                        BotRunnerState(pauseAfterPhase = pauseAfterPhase).takeIf {
+                            bots.isNotEmpty()
+                        },
                 )
         )
         val creatorName = header.players.single { it.id == creatorId }.name

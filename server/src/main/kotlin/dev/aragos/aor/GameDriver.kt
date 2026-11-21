@@ -25,6 +25,8 @@ data class Revision(
      * Historical format-upgrade archive; retained for replay and audit, never added to new games.
      */
     val storageArchive: String? = null,
+    /** A review pause holds the next phase's unresolved authority outcomes at this boundary. */
+    val defersPhaseOutcomes: Boolean = false,
 )
 
 data class StoredGame(
@@ -79,6 +81,13 @@ data class StoredGame(
 
     val revision: Int
         get() = revisions.last().id
+
+    /** Consent and administrative metadata revisions do not consume a held phase. */
+    internal val phaseOutcomesDeferred: Boolean
+        get() =
+            revisions
+                .lastOrNull { it.entries.isNotEmpty() || it.replaceFrom != null }
+                ?.defersPhaseOutcomes == true
 
     val undoPolicy: UndoPolicy
         get() =
@@ -166,15 +175,15 @@ class GameDriver(private val random: SetupRandom = AuthorityRandom()) {
     }
 
     fun submit(stored: StoredGame, player: PlayerId, command: Command): StoredGame {
-        val state = stored.state()
-        return GameAbandonment.reconcile(stored, submit(stored, state, player, command))
+        val ready = BotAutomation.beforeHumanAction(stored, player)
+        return GameAbandonment.reconcile(stored, submit(ready, stored.state(), player, command))
     }
 
     /** Resolve live shorthand after authentication, then record only canonical commands. */
     fun submit(stored: StoredGame, player: PlayerId, text: String): StoredGame {
         val state = stored.state()
         val action = TextCodec.parseAction(text, state, actor = player)
-        return GameAbandonment.reconcile(stored, submit(stored, state, player, action.command))
+        return submit(stored, player, action.command)
     }
 
     /**
@@ -270,8 +279,48 @@ class GameDriver(private val random: SetupRandom = AuthorityRandom()) {
         actions: List<Entry.Action>,
     ): StoredGame {
         val stateAfterActions = actions.fold(state) { current, action -> current.step(action) }
-        val (outcomes, after) = resolveOutcomes(stateAfterActions)
-        val entries = actions + outcomes
+        var held: StoredGame? = null
+        val (outcomes, after) =
+            resolveOutcomes(stateAfterActions) { current, resolved ->
+                if (
+                    stored.botRunner?.pauseAfterPhase != true ||
+                        stored.botRunner.paused ||
+                        !hasNextPhaseOutcomes(state, current)
+                ) {
+                    false
+                } else {
+                    val boundary =
+                        append(stored, player, command, actions + resolved, deferPhase = true)
+                    val reviewed = BotAutomation.afterCommit(boundary, state, current)
+                    if (reviewed.botRunner?.paused == true) {
+                        held = reviewed
+                        true
+                    } else false
+                }
+            }
+        return held
+            ?: BotAutomation.afterCommit(
+                append(stored, player, command, actions + outcomes),
+                state,
+                after,
+            )
+    }
+
+    internal fun continuePhase(stored: StoredGame): StoredGame {
+        if (!stored.phaseOutcomesDeferred) return stored
+        val (outcomes) = resolveOutcomes(stored.state())
+        check(outcomes.isNotEmpty()) { "A deferred phase requires unresolved authority outcomes." }
+        val completed = append(stored, stored.header.creatorId, CONTINUE_PHASE, outcomes)
+        return GameAbandonment.reconcile(stored, completed)
+    }
+
+    private fun append(
+        stored: StoredGame,
+        player: PlayerId,
+        command: String,
+        entries: List<Entry>,
+        deferPhase: Boolean = false,
+    ): StoredGame {
         val revision =
             Revision(
                 id = stored.revision + 1,
@@ -279,17 +328,20 @@ class GameDriver(private val random: SetupRandom = AuthorityRandom()) {
                 author = player,
                 command = command,
                 entries = entries.map(TextCodec::print),
+                defersPhaseOutcomes = deferPhase,
             )
-        val committed =
-            stored.copy(revisions = stored.revisions + revision, submissionVersions = emptyMap())
-        return BotAutomation.afterCommit(committed, state, after)
+        return stored.copy(revisions = stored.revisions + revision, submissionVersions = emptyMap())
     }
 
-    private fun resolveOutcomes(state: GameState): Pair<List<Entry>, GameState> {
+    private fun resolveOutcomes(
+        state: GameState,
+        defer: (GameState, List<Entry>) -> Boolean = { _, _ -> false },
+    ): Pair<List<Entry>, GameState> {
         var current = state
         val outcomes = buildList {
             while (true) {
                 val need = (current.prompts().singleOrNull() as? Prompt.System)?.need ?: break
+                if (defer(current, this)) break
                 val outcome =
                     when (need) {
                         is SystemNeed.Shuffle -> Entry.Shuffle(random.shuffle(need.cards))
@@ -314,6 +366,17 @@ class GameDriver(private val random: SetupRandom = AuthorityRandom()) {
         return outcomes to current
     }
 }
+
+internal const val CONTINUE_PHASE = "continue-phase"
+
+/** An ordinary turn boundary may have a new phase's draws or rolls waiting for authority. */
+internal fun hasNextPhaseOutcomes(before: GameState, after: GameState): Boolean =
+    (before.stage.isTurnPhase ||
+        before.stage == Stage.TOKEN_PURCHASE ||
+        before.stage == Stage.TURN_ORDER_TIE) &&
+        after.stage.isTurnPhase &&
+        before.stage != after.stage &&
+        after.prompts().singleOrNull() is Prompt.System
 
 /**
  * The creation transaction records every resolved default, independent of future default changes.

@@ -9,7 +9,7 @@ export function useBotAutomation(snapshot: Snapshot | null, token: string | unde
     humanBusy: {current: boolean}, changed: () => Promise<void>) {
     const [status, setStatus] = useState<BotRunnerStatus>('starting');
     const [operating, setOperating] = useState(false);
-    const [blocked, setBlocked] = useState(false);
+    const [blockedEpoch, setBlockedEpoch] = useState<number | null>(null);
     const [phasePauseError, setPhasePauseError] = useState(false);
     const [savingPhasePause, setSavingPhasePause] = useState(false);
     const phasePauseRequest = useRef<AbortController | null>(null);
@@ -23,6 +23,7 @@ export function useBotAutomation(snapshot: Snapshot | null, token: string | unde
     const canControl = automation?.canControl ?? false;
     const paused = automation?.paused ?? false;
     const epoch = automation?.epoch ?? 0;
+    const blocked = blockedEpoch === epoch;
     const ended = snapshot?.game.stage === 'FINISHED' || (snapshot?.status !== undefined && snapshot.status !== 'ACTIVE');
     const viewer = snapshot?.viewerId;
 
@@ -44,7 +45,7 @@ export function useBotAutomation(snapshot: Snapshot | null, token: string | unde
             suspended: () => humanBusy.current,
             status: value => {
                 setStatus(value);
-                if (value === 'stopped' || value === 'uncertain') setBlocked(true);
+                if (value === 'stopped' || value === 'uncertain') setBlockedEpoch(epoch);
             },
             uuid: () => crypto.randomUUID(),
         });
@@ -75,10 +76,10 @@ export function useBotAutomation(snapshot: Snapshot | null, token: string | unde
             if (controller.signal.aborted) return;
             await current.current.changed();
             if (controller.signal.aborted) return;
-            setBlocked(false);
+            setBlockedEpoch(null);
             setStatus(operation === 'pause' ? 'paused' : 'starting');
         } catch {
-            if (!controller.signal.aborted) {setBlocked(true); setStatus('uncertain');}
+            if (!controller.signal.aborted) {setBlockedEpoch(live.automation.epoch); setStatus('uncertain');}
         } finally {
             if (!controller.signal.aborted) setOperating(false);
             if (controls.current === controller) controls.current = null;

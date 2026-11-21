@@ -52,8 +52,10 @@ try {
     await page.wait(`document.querySelector('#names')`, 'local creation form');
     await page.fill('#game-name', 'A human and two local opponents');
     await page.fill('#names', 'Ada');
+    assert.equal(await page.evaluate(`document.querySelector('.automated-opponents .bot-phase-option')`), null);
     await page.click('Add automated opponent');
     await page.click('Add automated opponent');
+    await click('.automated-opponents .bot-phase-option input');
     assert.equal(await page.evaluate(`document.querySelectorAll('.automated-opponents select').length`), 0);
     assert.match(await page.evaluate(`document.querySelector('.automated-opponents').textContent`), /experimental.*Latest update: aor-hard-/);
     assert.equal(await page.evaluate('window.botWorkerInputs.length'), 0, 'Game setup does not load a model');
@@ -76,6 +78,7 @@ try {
     assert.equal(initial.game.players.length, 3);
     assert.deepEqual(initial.automation.players.map(player => player.difficulty), ['HARD', 'HARD']);
     assert.equal(initial.automation.canControl, true);
+    assert.equal(initial.automation.pauseAfterPhase, true, "Creation persists phase reviews");
     assert.equal(initial.game.hand.length, initial.game.players[0].handCount, 'The human snapshot contains only the human hand');
     const inputs = await page.evaluate('window.botWorkerInputs');
     assert(inputs.length >= 2, 'Real Kotlin worker chooses moves for both automated seats');
@@ -171,7 +174,10 @@ try {
         return toggle?.offsetWidth > 0 && !toggle.disabled &&
             document.querySelector('.bot-controls button')?.textContent === 'Pause automated opponents';
     })()`, 'phase pause is available after the lease transfer');
-    assert.equal(await page.evaluate(`document.querySelector('.bot-phase-option input').checked`), false);
+    assert.equal(await page.evaluate(`document.querySelector('.bot-phase-option input').checked`), true);
+    await click('.bot-phase-option input');
+    await waitState(snapshot => !snapshot.automation.pauseAfterPhase, 'the creator can disable the creation setting');
+    await page.wait(`!document.querySelector('.bot-phase-option input').checked && !document.querySelector('.bot-phase-option input').disabled`, 'the disabled setting appears');
     await click('.bot-phase-option input');
     await waitState(snapshot => snapshot.automation.pauseAfterPhase, 'phase pause setting is durable');
     await page.wait(`document.querySelector('.bot-phase-option input').checked`, 'saved setting appears');
@@ -179,11 +185,25 @@ try {
     assert.equal((await state()).automation.paused, false, 'Unrevealed bids do not pause bots');
     await click('.bid-action');
     const phasePause = await waitState(snapshot => snapshot.automation.pausedAfterPhase === 'BIDDING', 'capital bids reveal and automation pauses at the phase boundary');
-    await page.wait(`document.querySelector('.bot-phase-pause')?.textContent.includes('Capital bids')`, 'the pause explains which phase ended');
-    await page.viewportScreenshot(join(process.env.AOR_BROWSER_ARTIFACTS, 'automated-phase-pause-desktop.png'));
+    assert(phasePause.prompt?.players.includes(phasePause.viewerId), 'the human chooses the first capital');
+    await page.wait(`document.querySelector('.decision-panel[data-action-ready="true"]')`, 'the human capital choice appears');
+    assert.equal(await page.evaluate(`document.querySelector('.bot-phase-pause, .bot-activity-shortcut')`), null,
+        'The pause controls are absent while the human has a move');
+    const capitalCommand = phasePause.legalChoices.commands.find(command => command.startsWith('choose-capital '));
+    assert(capitalCommand);
+    await send(capitalCommand);
+    const seatPause = await waitState(snapshot => snapshot.automation.pausedAfterPlayer, 'human move resumes automation until the first automated capital choice');
+    const capital = seatPause.game.players.find(player => player.id === seatPause.automation.pausedAfterPlayer).capital;
+    assert(capital);
+    await page.wait(`(() => {
+        const label = document.querySelector('.bot-phase-pause .identity-label');
+        return label?.querySelector('svg') && label.textContent.toLowerCase() === ${JSON.stringify(capital)};
+    })()`, 'the pause identifies the automated seat by its chosen capital and symbol');
+    assert.equal(await page.evaluate(`document.querySelector('.bot-phase-pause button').closest('#workspace-activity')?.hidden`), true, 'Resume belongs to the activity workspace');
     await page.click('View activity');
     await page.wait(`document.querySelector('#tab-activity')?.getAttribute('aria-selected') === 'true' && !document.querySelector('#workspace-activity').hidden`, 'activity shortcut opens the activity workspace');
     assert.equal(await page.evaluate(`!document.querySelector('.bot-controls button')`), true, 'The phase pause has one Resume action');
+    await page.viewportScreenshot(join(process.env.AOR_BROWSER_ARTIFACTS, 'automated-phase-pause-desktop.png'));
     await page.send('Emulation.setDeviceMetricsOverride', {width: 390, height: 844, deviceScaleFactor: 1, mobile: true});
     await page.wait(`(() => {
         const button = document.querySelector('.bot-phase-pause button:last-child').getBoundingClientRect();
@@ -192,9 +212,11 @@ try {
     })()`, 'Resume is visible and reachable on a phone');
     await page.viewportScreenshot(join(process.env.AOR_BROWSER_ARTIFACTS, 'automated-phase-pause-phone.png'));
     await page.click('Resume automated opponents');
-    await waitState(snapshot => !snapshot.automation.paused && snapshot.automation.pauseAfterPhase, 'Resume keeps the phase pause setting enabled');
+    const nextPause = await waitState(snapshot => snapshot.automation.pausedAfterPlayer &&
+        snapshot.automation.pausedAfterPlayer !== seatPause.automation.pausedAfterPlayer, 'Resume reaches the next seat’s pause');
+    assert(nextPause.automation.pauseAfterPhase);
     await page.send('Emulation.setDeviceMetricsOverride', {width: 1440, height: 980, deviceScaleFactor: 1, mobile: false});
-    await page.wait(`!document.querySelector('#tab-players') && !document.querySelector('.bot-phase-pause')`, 'Resume clears the phase status');
+    await page.wait(`!document.querySelector('#tab-players') && document.querySelector('.decision-panel[data-action-ready="true"]') && !document.querySelector('.bot-phase-pause')`, 'the next human action hides the pause in the activity workspace');
     await click('.bot-phase-option input');
     await waitState(snapshot => !snapshot.automation.pauseAfterPhase, 'creator can restore continuous play');
     assert.equal(phasePause.events.filter(event => event.kind === 'BID_CAPITAL').length, 3);

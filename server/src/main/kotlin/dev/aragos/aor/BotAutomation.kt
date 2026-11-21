@@ -53,7 +53,8 @@ data class BotOperationReceipt(
  * Browser leases last 30 seconds. [epoch] fences every earlier owner after release or takeover.
  * Receipts are bounded reconciliation facts and survive rewind; they never replay bot decisions.
  * [pauseAfterPhase] is the creator's game-wide pacing setting. [pausedAfterPhase] records the
- * completed table phase for a phase-induced pause, until explicit resume or another pause.
+ * reviewed phase and [pausedAfterPlayer] identifies the automated seat for a sequential activity. A
+ * shared reveal or a phase pause saved before seat-level pacing has no seat.
  */
 data class BotRunnerState(
     val epoch: Int = 0,
@@ -63,6 +64,7 @@ data class BotRunnerState(
     val receipts: List<BotOperationReceipt> = emptyList(),
     val pauseAfterPhase: Boolean = false,
     val pausedAfterPhase: Stage? = null,
+    val pausedAfterPlayer: PlayerId? = null,
 ) {
     init {
         require(epoch >= 0 && leaseUntil >= 0) {
@@ -73,6 +75,9 @@ data class BotRunnerState(
         }
         require(pausedAfterPhase == null || paused) {
             "A completed phase can only be the reason for a paused browser runner."
+        }
+        require(pausedAfterPlayer == null || pausedAfterPhase != null) {
+            "A reviewed seat requires a completed phase."
         }
         require(!paused || runnerId == null) {
             "Paused automated players cannot retain an active browser lease."
@@ -103,6 +108,7 @@ data class AutomationView(
     val epoch: Int,
     val pauseAfterPhase: Boolean,
     val pausedAfterPhase: Stage?,
+    val pausedAfterPlayer: PlayerId?,
 )
 
 data class BotDecisionWork(
@@ -127,14 +133,6 @@ data class BotWork(
     val operationReceipts: List<String>,
 )
 
-/** Tie resolution belongs to the corresponding phase in the table timeline. */
-internal fun Stage.tablePhase(): Stage =
-    when (this) {
-        Stage.CAPITAL_TIE -> Stage.BIDDING
-        Stage.TURN_ORDER_TIE -> Stage.TOKEN_PURCHASE
-        else -> this
-    }
-
 /** Fenced automated decisions use the ordinary authority driver under the game lock. */
 internal object BotAutomation {
     private const val LEASE_MILLIS = 30000L
@@ -158,23 +156,73 @@ internal object BotAutomation {
             epoch = runner.epoch,
             pauseAfterPhase = runner.pauseAfterPhase,
             pausedAfterPhase = runner.pausedAfterPhase,
+            pausedAfterPlayer = runner.pausedAfterPlayer,
         )
     }
 
-    /** Called on the ordinary append path, including a phase closed by a human or a plan. */
+    /** A successful human game command releases a review pause without granting a browser lease. */
+    fun beforeHumanAction(game: StoredGame, player: PlayerId): StoredGame =
+        if (player in game.bots) game else resumeReviewPause(game)
+
+    private fun resumeReviewPause(game: StoredGame): StoredGame {
+        val runner = game.botRunner ?: return game
+        if (runner.pausedAfterPhase == null) return game
+        return game.copy(
+            botRunner =
+                runner.copy(
+                    epoch = nextEpoch(runner),
+                    paused = false,
+                    pausedAfterPhase = null,
+                    pausedAfterPlayer = null,
+                )
+        )
+    }
+
+    /** Check the completed seat activity after all authority outcomes for the command resolve. */
     fun afterCommit(game: StoredGame, before: GameState, after: GameState): StoredGame {
         val runner = game.botRunner ?: return game
         if (!runner.pauseAfterPhase || runner.paused || after.stage == Stage.FINISHED) return game
-        val phase = before.stage.tablePhase()
-        if (phase == after.stage.tablePhase() && before.turnNumber == after.turnNumber) return game
-        return if (HistoryProjection.hasAutomatedDecision(game, phase, before.turnNumber)) {
-            pause(game, phase)
-        } else {
-            game
+        val phase = before.stage
+        val phaseChanged = phase != after.stage || before.turnNumber != after.turnNumber
+        if (phase == Stage.BIDDING || phase == Stage.TOKEN_PURCHASE) {
+            return if (
+                phaseChanged &&
+                    HistoryProjection.hasAutomatedDecision(game, before.entryCount, game.bots.keys)
+            ) {
+                pause(game, phase)
+            } else game
         }
+        val owner = before.flow.actor
+        if (owner != null && before.flow.phaseBookkeepingApplied) {
+            if (!phaseChanged && owner == after.flow.actor) return game
+            return if (
+                owner in game.bots &&
+                    HistoryProjection.hasAutomatedDecision(
+                        game,
+                        before.activityStart,
+                        setOf(owner),
+                        excludeOrderSwaps = true,
+                    )
+            ) {
+                pause(game, phase, owner)
+            } else game
+        }
+        // Setup and phase-opening prompts each belong directly to their responding seat.
+        val responder = (before.prompts().singleOrNull() as? Prompt.SinglePlayer)?.player
+        return if (
+            responder != null &&
+                responder in game.bots &&
+                HistoryProjection.hasAutomatedDecision(game, before.entryCount, setOf(responder))
+        ) {
+            pause(game, phase, responder)
+        } else game
     }
 
-    fun pause(game: StoredGame, completedPhase: Stage? = null): StoredGame {
+    fun pause(
+        game: StoredGame,
+        completedPhase: Stage? = null,
+        completedPlayer: PlayerId? = null,
+    ): StoredGame {
         val runner = game.botRunner ?: return game
         return game.copy(
             botRunner =
@@ -182,6 +230,7 @@ internal object BotAutomation {
                     epoch = nextEpoch(runner),
                     paused = true,
                     pausedAfterPhase = completedPhase,
+                    pausedAfterPlayer = completedPlayer,
                     runnerId = null,
                     leaseUntil = 0,
                 )
@@ -235,60 +284,71 @@ internal object BotAutomation {
                 if (!active(current) && operation !in setOf("pause", "release")) {
                     throw ServiceFailure(422, "GAME_INACTIVE")
                 }
-                when (operation) {
-                    "pause" -> pause(current)
-                    "set-phase-pause" ->
-                        current.copy(
-                            botRunner = runner.copy(pauseAfterPhase = pauseAfterPhase == true)
-                        )
-                    "release" -> {
-                        if (runner.runnerId != runnerId)
-                            throw ServiceFailure(409, "BOT_RUNNER_BUSY")
-                        current.copy(
-                            botRunner =
-                                runner.copy(
-                                    epoch = nextEpoch(runner),
-                                    runnerId = null,
-                                    leaseUntil = 0,
-                                )
-                        )
-                    }
-                    "renew" -> {
-                        requireLease(current, runnerId, runner.epoch, now)
-                        current.copy(botRunner = runner.copy(leaseUntil = now + LEASE_MILLIS))
-                    }
-                    "claim",
-                    "resume" -> {
-                        if (
-                            operation == "claim" &&
-                                runner.runnerId != null &&
-                                runner.runnerId != runnerId &&
-                                runner.leaseUntil > now
-                        ) {
-                            throw ServiceFailure(409, "BOT_RUNNER_BUSY")
+                val updated =
+                    when (operation) {
+                        "pause" -> pause(current)
+                        "set-phase-pause" -> {
+                            val enabled = pauseAfterPhase == true
+                            val updated =
+                                current.copy(botRunner = runner.copy(pauseAfterPhase = enabled))
+                            if (enabled) updated else resumeReviewPause(updated)
                         }
-                        if (operation == "claim" && runner.paused) current
-                        else
+                        "release" -> {
+                            if (runner.runnerId != runnerId)
+                                throw ServiceFailure(409, "BOT_RUNNER_BUSY")
                             current.copy(
                                 botRunner =
                                     runner.copy(
-                                        epoch =
-                                            if (
-                                                operation == "claim" &&
-                                                    runner.runnerId == runnerId &&
-                                                    runner.leaseUntil > now
-                                            ) {
-                                                runner.epoch
-                                            } else nextEpoch(runner),
-                                        paused = false,
-                                        pausedAfterPhase = null,
-                                        runnerId = runnerId,
-                                        leaseUntil = now + LEASE_MILLIS,
+                                        epoch = nextEpoch(runner),
+                                        runnerId = null,
+                                        leaseUntil = 0,
                                     )
                             )
+                        }
+                        "renew" -> {
+                            requireLease(current, runnerId, runner.epoch, now)
+                            current.copy(botRunner = runner.copy(leaseUntil = now + LEASE_MILLIS))
+                        }
+                        "claim",
+                        "resume" -> {
+                            if (
+                                operation == "claim" &&
+                                    runner.runnerId != null &&
+                                    runner.runnerId != runnerId &&
+                                    runner.leaseUntil > now
+                            ) {
+                                throw ServiceFailure(409, "BOT_RUNNER_BUSY")
+                            }
+                            if (operation == "claim" && runner.paused) current
+                            else
+                                current.copy(
+                                    botRunner =
+                                        runner.copy(
+                                            epoch =
+                                                if (
+                                                    operation == "claim" &&
+                                                        runner.runnerId == runnerId &&
+                                                        runner.leaseUntil > now
+                                                ) {
+                                                    runner.epoch
+                                                } else nextEpoch(runner),
+                                            paused = false,
+                                            pausedAfterPhase = null,
+                                            pausedAfterPlayer = null,
+                                            runnerId = runnerId,
+                                            leaseUntil = now + LEASE_MILLIS,
+                                        )
+                                )
+                        }
+                        else -> throw ServiceFailure(400, "INVALID_REQUEST")
                     }
-                    else -> throw ServiceFailure(400, "INVALID_REQUEST")
-                }
+                if (
+                    updated.phaseOutcomesDeferred &&
+                        updated.botRunner?.paused == false &&
+                        active(updated)
+                ) {
+                    service.driver.continuePhase(updated)
+                } else updated
             }
         return work(stored, now)
     }
