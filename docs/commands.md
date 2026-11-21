@@ -115,6 +115,7 @@ cancellation, abandonment and purge; these are not player commands.
 | `buy-card` | Urban Ascendancy owner in Buy Card; once per turn, costs $10 and requests a draw. |
 | `discard-card <reference>` | Master Art owner in Buy Card; publicly discards one owned card without effect, once per turn. Independent of buying a card; either order is accepted. |
 | `swap-order <player>` | Player answering a Renaissance decision; swap with an adjacent active player who lacks Renaissance. |
+| `pass-renaissance` | Player answering a Renaissance decision. Keep the current order and decline all further Renaissance offers for that player this turn. Use `pass` to keep the order for this phase only. |
 | `upgrade-ships` | Shipping purchase step; buys the next eligible upgrade for $10 and proceeds to Advances. At most once per turn. |
 | `buy-advance <advance>` | Advances purchase step; buys an affordable unowned advance with its prerequisites and applicable discounts. Repeat as permitted, then `pass`. |
 | `stabilize cash` | Positive-cost Stabilization step; pays the hand's stabilization cost in cash. |

@@ -606,6 +606,7 @@ fieldset.choice-buttons {border: 0; margin: 0; padding: 0; min-width: 0;}
 .decision-actions[data-layout="paired"] > .pass-action { border-radius: 0 5px 5px 0; border-left-color: #bad2bd; }
 .decision-actions[data-action-count="3"] > .pass-action { grid-column: 1 / -1; }
 .decision-actions[data-action-count="3"] { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.decision-actions[data-action-count="3"] > .renaissance-pass { grid-column: auto; }
 
 .ending-status { color: #793d16; font-weight: 700; }
 .discard-request { border-left: 3px solid var(--focus); padding: .5rem .65rem; background: #f8efd5; }

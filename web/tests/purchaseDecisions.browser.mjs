@@ -79,8 +79,8 @@ async function checkRenaissance(page, web, game, actor, state) {
     for (const [width, height, mobile] of sizes) {
         await page.send('Emulation.setDeviceMetricsOverride', {width, height, deviceScaleFactor: 1, mobile});
         assert.equal(await page.evaluate(`document.querySelector('.pass-action').textContent`), 'Keep turn order');
-        assert.equal(await page.evaluate(`document.querySelectorAll('.decision-actions button').length`), 1,
-            'Only the current Renaissance commitment occupies the footer');
+        assert.deepEqual(await page.evaluate(`[...document.querySelectorAll('.decision-actions button')].map(button => button.textContent)`),
+            ['Keep turn order', 'Pass for the rest of this turn'], 'The footer presents both Renaissance pass options');
         assert.equal(await page.evaluate(`document.querySelector(${JSON.stringify(scheduled('pass'))}).textContent`), 'Pass on my turn');
         assert.match(await page.evaluate(`document.querySelector('.card-purchase-planner').textContent`), /wait until Renaissance is resolved/);
         await page.screenshot(join(process.env.AOR_BROWSER_ARTIFACTS, `renaissance-card-choice-${width}.png`), width, height, mobile);
@@ -116,14 +116,23 @@ async function checkRenaissance(page, web, game, actor, state) {
         'Renaissance window restored');
     await click(page, scheduled('pass'));
     await page.wait(`document.querySelector(${JSON.stringify(scheduled('pass'))})?.getAttribute('aria-pressed') === 'true'`,
-        'card Pass rescheduled for Keep turn order');
-    await page.click('Keep turn order');
+        'card Pass rescheduled for the turn-long Renaissance pass');
+    await rejectNextCommand(page);
+    await page.click('Pass for the rest of this turn');
+    await page.wait(`document.querySelector('.decision-panel [role="alert"]') && !document.querySelector('.renaissance-turn-pass').disabled`,
+        'the rejected turn-long pass can be retried');
+    await page.click('Pass for the rest of this turn');
     await page.wait(`document.querySelector('#tool-tab-commands small')?.textContent.trim() !== 'Revision ${restored.revision}'`,
-        'Keep preserves and executes the scheduled card Pass');
+        'the turn-long pass preserves and executes the scheduled card Pass');
     const passed = await game.snapshot(actor);
+    assert(passed.history.includes(`${actor.id}: pass-renaissance`));
+    assert.deepEqual(passed.game.turnOrder, state.game.turnOrder);
     assert.equal(passed.history.filter(line => line === `${actor.id}: pass`).length,
-        restored.history.filter(line => line === `${actor.id}: pass`).length + 2,
-        'Keep resolves Renaissance and executes exactly the scheduled card Pass');
+        restored.history.filter(line => line === `${actor.id}: pass`).length + 1,
+        'The turn-long pass resolves Renaissance and executes exactly the scheduled card Pass');
+    await page.reload();
+    await page.wait(`document.querySelector('#tool-tab-commands small')?.textContent.trim() === 'Revision ${passed.revision}' && !document.querySelector('.renaissance-turn-pass')`,
+        'the resolved Renaissance offer stays closed after reload');
     const swapWindow = await game.send(actor, `undo ${restored.undo.entryCount}`);
     await page.wait(`document.querySelector('#tool-tab-commands small')?.textContent.trim() === 'Revision ${swapWindow.revision}' && document.querySelector('.card-purchase-choices button')`,
         'independent swap window restored');
@@ -206,7 +215,7 @@ export async function checkLivePurchaseDecisions(page, web) {
         }
     }
     assert(patronage && renaissance, 'Normal play reaches live Patronage and Renaissance card-purchase decisions');
-    console.log('Passed: single-click live Patronage, payment endpoints, rejection and references; independent Renaissance/card choices, reload, cancellation, Keep/swap and scheduled execution.');
+    console.log('Passed: single-click live Patronage, payment endpoints, rejection and references; Renaissance phase pass, turn pass, swap, reload and scheduled execution.');
 }
 
 if (process.argv[1] && pathToFileURL(process.argv[1]).href === import.meta.url) {

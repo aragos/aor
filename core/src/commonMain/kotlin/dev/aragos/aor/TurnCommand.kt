@@ -13,11 +13,7 @@ sealed interface TurnCommand : Command {
                 return resumed
             }
             val decision = state.flow.decisions.lastOrNull()
-            if (decision is ImmediateMasterArtDecision) {
-                checkRule(decision.player == actor, ViolationCode.WRONG_PLAYER)
-                return state.popDecision()
-            }
-            if (decision is RenaissanceDecision) {
+            if (decision is ImmediateMasterArtDecision || decision is RenaissanceDecision) {
                 checkRule(decision.player == actor, ViolationCode.WRONG_PLAYER)
                 return state.popDecision()
             }
@@ -50,6 +46,20 @@ sealed interface TurnCommand : Command {
                     throw RuleViolation(ViolationCode.STABILIZATION_REQUIRED)
                 PurchaseStep.RELIEF -> state.finishActor()
             }
+    }
+
+    data object PassRenaissance : TurnCommand {
+        override fun toText(): String = "pass-renaissance"
+
+        override fun applyTo(state: GameState, actor: PlayerId): GameState {
+            val decision = state.flow.decisions.lastOrNull()
+            checkRule(decision is RenaissanceDecision, ViolationCode.WRONG_PHASE)
+            checkRule(decision?.player == actor, ViolationCode.WRONG_PLAYER)
+            val next = state.popDecision()
+            return next.copy(
+                flow = next.flow.copy(renaissancePassed = next.flow.renaissancePassed + actor)
+            )
+        }
     }
 
     data class SwapOrder(val target: PlayerId) : TurnCommand {
@@ -229,6 +239,10 @@ sealed interface TurnCommand : Command {
                     "pass" -> {
                         arguments.sizeIs(0)
                         Pass
+                    }
+                    PassRenaissance.toText() -> {
+                        arguments.sizeIs(0)
+                        PassRenaissance
                     }
                     "buy-card" -> {
                         arguments.sizeIs(0)

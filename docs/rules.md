@@ -180,7 +180,8 @@ After the last turn's Income phase comes the [Final Card Play](#8-end-of-game).
 **Renaissance swap.** At the start of any phase, a player owning Renaissance may swap order with an adjacent player that
 does not own it ([§10.3](#103-advance-effects)). The app offers this only where order matters:
 Draw Card (before cancellation and draws), Buy Card, Play Cards, Purchase, Expansion and Final Card
-Play. Token purchase is simultaneous; Income has no Renaissance window.
+Play. An owner can keep the order for the current phase or decline their remaining swap offers for
+the turn. Token purchase is simultaneous. Income has no Renaissance window.
 
 ---
 

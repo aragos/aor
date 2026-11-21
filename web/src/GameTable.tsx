@@ -165,7 +165,7 @@ export function GameTable({snapshot: liveSnapshot, busy: requestBusy, submit: se
             return appended;
         }
         const accepted = await resolveCommand(command);
-        if (accepted && /^(pass$|play |place |move-marker )/.test(command)) {
+        if (accepted && /^(pass$|pass-renaissance$|play |place |move-marker )/.test(command)) {
             resetSelection();
         }
         return accepted;
@@ -303,8 +303,13 @@ export function GameTable({snapshot: liveSnapshot, busy: requestBusy, submit: se
             <div className="workspace-side" hidden={expandedMap}>
                 <aside className={`decision-panel decision ${hasContext ? 'has-context' : ''} ${actionsCollapsed ? 'sheet-collapsed' : ''}`} aria-label={t(spectator ? 'table.spectatorView' : 'table.currentDecision')}
                     data-action-ready={actuallyActing && !inactive && !finished}>
-                    <DecisionActions pass={!spectator && !inactive && canAct && snapshot.legalChoices.commands.includes('pass') &&
-                        <button type="button" className={`pass-action ${snapshot.prompt?.messageId.startsWith('prompt.purchase-') ? 'purchase-continuation' : ''} ${snapshot.prompt?.messageId === 'prompt.renaissance' ? 'renaissance-pass' : ''}`} disabled={busy} onClick={() => { void submit('pass'); }}>{planner.open && <>{t('plan.add')} · </>}{purchasePassLabel(snapshot)}</button>}>
+                    <DecisionActions pass={!spectator && !inactive && canAct && <>
+                        {snapshot.legalChoices.commands.includes('pass') &&
+                            <button type="button" className={`pass-action ${snapshot.prompt?.messageId.startsWith('prompt.purchase-') ? 'purchase-continuation' : ''} ${prompt === 'renaissance' ? 'renaissance-pass' : ''}`} disabled={busy} onClick={() => { void submit('pass'); }}>{planner.open && <>{t('plan.add')} · </>}{purchasePassLabel(snapshot)}</button>}
+                        {snapshot.legalChoices.commands.includes('pass-renaissance') &&
+                            <button type="button" className="pass-action renaissance-turn-pass" disabled={busy}
+                                onClick={() => { void submit('pass-renaissance'); }}>{t('action.pass-renaissance')}</button>}
+                    </>}>
                     <div className={`decision-toolbar ${objectAction ? 'object-heading' : ''}`}>
                         <div className="decision-title-group">
                             {objectAction && <span className="decision-action-label">{decision}</span>}

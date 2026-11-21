@@ -522,7 +522,8 @@ internal object HistoryEvents {
             is Command.BuyTokens -> event(HistoryEventKind.BUY_TOKENS).copy(amount = command.amount)
             is Command.ChooseTurnPosition ->
                 event(HistoryEventKind.CHOOSE_TURN_POSITION).copy(amount = command.slot)
-            TurnCommand.Pass -> null
+            TurnCommand.Pass,
+            TurnCommand.PassRenaissance -> null
             is TurnCommand.SwapOrder ->
                 event(HistoryEventKind.SWAP_ORDER).copy(target = command.target)
             TurnCommand.BuyCard -> event(HistoryEventKind.BUY_CARD)
