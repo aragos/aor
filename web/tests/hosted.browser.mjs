@@ -28,12 +28,14 @@ export async function checkHosted(page, web, artifacts) {
             if (path.endsWith('/firebase_auth.js')) body = firebase;
             else if (path === '/api/config') body = JSON.stringify({authMode: 'firebase', firebase: {
                 apiKey: 'browser-test-key', projectId: 'browser-test', authDomain: 'browser-test.firebaseapp.com',
-            }, pollIntervalMs: 1000});
+            }, pollIntervalMs: 1000, automataVersion: "aor-hard-test"});
             else {
-                assert.equal(params.request.headers.Authorization, 'Bearer firebase-id-token');
+                const token = params.request.headers.Authorization;
+                assert(['Bearer firebase-id-token', 'Bearer firebase-verified-token'].includes(token));
                 if (path === '/api/me') {
-                    sessions.push(params.request.headers.Authorization);
-                    body = JSON.stringify({id: account?.id ?? 'google-player', emailVerified, account});
+                    sessions.push(token);
+                    body = JSON.stringify({id: account?.id ?? 'google-player',
+                        emailVerified: emailVerified || token === 'Bearer firebase-verified-token', account});
                     if (holdSession) {holdSession = false; await new Promise(resolve => {releaseSession = resolve;});}
                 } else if (path === '/api/players/register') {
                     const registration = JSON.parse(params.request.postData);
@@ -125,7 +127,7 @@ export async function checkHosted(page, web, artifacts) {
                 {method: 'sendPasswordResetEmail', email: 'player@example.com'});
             assert.equal(await page.evaluate(`window.firebaseTest.calls.some(call => call.method === 'signInWithEmailAndPassword')`), false);
         });
-        await check('Email account creation sends verification before player registration', async () => {
+        await check('Email verification opens registration on returning to the signup tab', async () => {
             emailVerified = false;
             await page.click('Create account');
             await page.fill('input[type=email]', 'player@example.com');
@@ -136,7 +138,19 @@ export async function checkHosted(page, web, artifacts) {
             await page.wait(`document.querySelector('h1')?.textContent === 'Verify your email'`, 'Account email verification');
             assert.deepEqual(await page.evaluate(`window.firebaseTest.calls.find(call => call.method === 'createUserWithEmailAndPassword')`),
                 {method: 'createUserWithEmailAndPassword', email: 'player@example.com', password: 'fixture-password'});
-            assert.equal(await page.evaluate(`window.firebaseTest.calls.filter(call => call.method === 'sendEmailVerification').length`), 1);
+            assert.deepEqual(await page.evaluate(`window.firebaseTest.calls.filter(call => call.method === 'sendEmailVerification')`),
+                [{method: 'sendEmailVerification', url: web + '/play'}]);
+            await page.evaluate(`window.firebaseTest.rejectContinueUrl = true`);
+            await page.click('Resend email');
+            await page.wait(`document.querySelector('[role=status]')?.textContent.includes('Verification email sent')`, 'Verification email still sends from alternate domains');
+            assert.deepEqual(await page.evaluate(`window.firebaseTest.calls.filter(call => call.method === 'sendEmailVerification').map(call => call.url)`),
+                [web + '/play', web + '/play', null]);
+            await page.click('I’ve verified my email');
+            await page.wait(`document.querySelector('[role=status]')?.textContent.includes('Verification is still pending')`, 'Unverified account can retry');
+            await page.evaluate(`window.firebaseTest.setEmailVerified(true); window.dispatchEvent(new FocusEvent('focus'))`);
+            await page.wait(`document.querySelector('input[autocomplete=username]')`, 'Player registration without signing back in');
+            assert.equal(sessions.at(-1), 'Bearer firebase-verified-token');
+            assert.equal(await page.evaluate(`window.firebaseTest.calls.some(call => call.method === 'signInWithEmailAndPassword')`), false);
         });
         await check('Google popup disables concurrent sign-in actions', async () => {
             await page.click('Sign in with Google');
@@ -195,15 +209,16 @@ export async function checkHosted(page, web, artifacts) {
             await page.wait(`document.querySelector('.portal')`, 'Registered player dashboard');
             assert.equal(await page.evaluate(`document.querySelector('.account-controls').textContent.includes('@alice')`), true);
         });
-        await check('Online games require registered humans and offer no automated opponents', async () => {
+        await check('Online games allow mixed tables with fixed Hard automated opponents', async () => {
             account = {...registeredAccount, mayCreateGames: true};
             await page.click('Sign in with Google');
             await page.evaluate(`window.firebaseTest.finishPopup()`);
             await page.wait(`document.querySelector('.create-registered form')`, 'approved game creation');
             await page.evaluate(`document.querySelector('.create-registered').open = true`);
-            await page.fill('#game-name', 'Alice, Bob and Carol');
-            assert.equal(await page.evaluate(`document.querySelector('.automated-opponents')`), null);
-            assert.equal(await page.evaluate(`document.querySelector('.create-registered').textContent.toLowerCase().includes('automated opponents')`), false);
+            await page.fill('#game-name', 'Alice, Bob and an automated opponent');
+            assert.match(await page.evaluate(`document.querySelector('.automated-opponents').textContent`),
+                /experimental.*Latest update: aor-hard-test/);
+            assert.equal(await page.evaluate(`document.querySelectorAll('.automated-opponents select').length`), 0);
             assert.equal(await page.evaluate(`document.querySelector('.create-registered form > button').disabled`), true,
                 'One registered player cannot start an online game');
             await page.fill('input[type=search]', 'bob');
@@ -211,20 +226,17 @@ export async function checkHosted(page, web, artifacts) {
             await page.click('@bob');
             assert.equal(await page.evaluate(`document.querySelector('.create-registered form > button').disabled`), true,
                 'Two registered players cannot start an online game');
-            await page.fill('input[type=search]', 'carol');
-            await page.wait(`document.querySelector('[aria-label="Matching players"]')?.textContent.includes('@carol')`, 'Carol appears in the directory');
-            await page.click('@carol');
+            await page.click('Add automated opponent');
             assert.equal(await page.evaluate(`document.querySelector('.create-registered form > button').disabled`), false);
             await page.screenshot(join(artifacts, 'hosted-creation-desktop.png'), 1280, 900);
             await page.screenshot(join(artifacts, 'hosted-creation-phone.png'), 390, 844, true);
             assert.equal(await page.evaluate(`document.documentElement.scrollWidth <= innerWidth + 1`), true,
                 'Online creation fits a phone');
-            assert.equal(await page.evaluate(`document.querySelector('.automated-opponents')`), null);
             await page.click('Create game');
-            await page.wait(`location.pathname === '/games/${gameId}' && document.readyState === 'complete'`, 'hosted creation navigates to the human game');
-            assert.deepEqual(creations.at(-1).players, ['google-player', 'player-bob', 'player-carol']);
-            assert.equal(Object.hasOwn(creations.at(-1), 'bots'), false);
-            assert.equal(creations.at(-1).name, 'Alice, Bob and Carol');
+            await page.wait(`location.pathname === '/games/${gameId}' && document.readyState === 'complete'`, 'hosted creation navigates to the game');
+            assert.deepEqual(creations.at(-1).players, ['google-player', 'player-bob']);
+            assert.deepEqual(creations.at(-1).bots, [{}]);
+            assert.equal(creations.at(-1).name, 'Alice, Bob and an automated opponent');
             await page.send('Emulation.clearDeviceMetricsOverride');
         });
         await check('Hosted game account controls share the game overview bar', async () => {
@@ -297,6 +309,7 @@ export async function checkHosted(page, web, artifacts) {
         });
         await check('Server email verification remains required for Google users', async () => {
             emailVerified = false;
+            await page.evaluate(`window.firebaseTest.setEmailVerified(false)`);
             await page.click('Sign in with Google');
             await page.evaluate(`window.firebaseTest.finishPopup()`);
             await page.wait(`document.querySelector('h1')?.textContent === 'Verify your email'`, 'Server verification requirement');

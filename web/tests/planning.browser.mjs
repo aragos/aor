@@ -55,10 +55,23 @@ async function checkPlanningTurnArrival(page, web) {
     await page.wait(`document.querySelector('[data-advance="URBAN_ASCENDANCY"].available')`, 'planned advance');
     await page.evaluate(`document.querySelector('[data-advance="URBAN_ASCENDANCY"]').click()`);
     await page.wait(`document.querySelector('.decision-panel .advance-decision')`, 'prepared purchase choice');
-    await page.evaluate(`window.arrivalDraft = document.querySelector('.decision-panel .advance-decision'); true`);
+    await page.evaluate(`(() => {
+        window.arrivalDraft = document.querySelector('.decision-panel .advance-decision');
+        const originalFetch = window.fetch;
+        window.fetch = async (input, init) => {
+            if (!String(input).endsWith('/plans/preview')) return originalFetch(input, init);
+            window.fetch = originalFetch;
+            window.staleQuote = true;
+            return new Response(JSON.stringify({code: 'STALE_REVISION'}), {status: 409});
+        };
+    })()`);
     await game.send(game.links[0], 'pass');
+    await page.wait('window.staleQuote', 'stale background quote after a live command');
+    assert.equal(await page.evaluate(`document.querySelector('.activity-planner [role="alert"]')`), null,
+        'A stale background quote does not interrupt planning');
     await game.send(game.links[0], 'undo');
-    await page.wait(`document.querySelector('.activity-planner[data-editing="true"]') && !document.querySelector('.activity-planner [role="alert"]')`,
+    await page.wait(`document.querySelector('.activity-planner[data-editing="true"]') &&
+        [...document.querySelectorAll('.decision-actions button')].some(button => button.textContent === 'Save for review' && !button.disabled)`,
         'another player undo retains the local plan');
     assert.equal(await page.evaluate(`document.querySelector('.decision-panel .advance-decision') === window.arrivalDraft`), true,
         'Same-phase undo preserves another player’s mounted choice');
@@ -135,7 +148,8 @@ export async function checkParallelPlanning(page, web) {
         assert.equal(await page.evaluate(`document.querySelectorAll('.plan-actions li strong')[1].textContent`),
             'Stabilization: pay cash', 'The draft identifies the stabilization step');
         await page.click('Save for review');
-        await page.wait(`document.querySelector('.activity-planner [role="status"]').textContent === 'Saved for review'`, 'durable review plan');
+        await page.wait(`!document.querySelector('.activity-planner [role="status"]') &&
+            [...document.querySelectorAll('.decision-actions button')].some(button => button.textContent === 'Execute automatically on my turn')`, 'durable review plan without a saved notice');
         assert.equal(await page.evaluate(`document.querySelectorAll('.plan-actions li strong')[1].textContent`),
             'Stabilization: pay cash', 'The saved summary identifies the stabilization step');
     }
@@ -219,17 +233,18 @@ export async function checkParallelPlanning(page, web) {
     await visit(2);
     await prepareAdvance();
     await page.click('Execute automatically on my turn');
-    await page.wait(`document.querySelector('.activity-planner [role="status"]').textContent === 'Automatic execution enabled'`, 'server authorization');
+    await page.wait(`document.querySelector('.activity-planner [role="status"]')?.textContent === 'Automatic execution enabled'`, 'server authorization');
     await page.click('Edit plan');
     await page.wait(`document.querySelector('.activity-planner[data-editing="true"]')`, 'confirmed disarm before editing');
     assert.equal((await game.snapshot(game.links[2])).planning.saved.armed, false);
     await page.click('Return to the table');
     await page.click('Execute automatically on my turn');
-    await page.wait(`document.querySelector('.activity-planner [role="status"]').textContent === 'Automatic execution enabled'`, 'authorization after editing');
+    await page.wait(`document.querySelector('.activity-planner [role="status"]')?.textContent === 'Automatic execution enabled'`, 'authorization after editing');
     await page.click('Cancel automatic execution');
-    await page.wait(`document.querySelector('.activity-planner [role="status"]').textContent === 'Saved for review'`, 'durable cancellation');
+    await page.wait(`!document.querySelector('.activity-planner [role="status"]') &&
+        [...document.querySelectorAll('.decision-actions button')].some(button => button.textContent === 'Execute automatically on my turn')`, 'durable cancellation');
     await page.click('Execute automatically on my turn');
-    await page.wait(`document.querySelector('.activity-planner [role="status"]').textContent === 'Automatic execution enabled'`, 'fresh authorization');
+    await page.wait(`document.querySelector('.activity-planner [role="status"]')?.textContent === 'Automatic execution enabled'`, 'fresh authorization');
 
     // An earlier purchase supplies new strategic information without committing a review plan.
     for (const command of ['pass', 'buy-advance V', 'pass', 'stabilize cash']) await game.send(game.links[0], command);

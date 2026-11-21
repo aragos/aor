@@ -5,7 +5,11 @@ import java.nio.file.Files
 import java.nio.file.Path
 
 /** Replays an explicit operational upgrade under the current engine without fresh outcomes. */
-internal fun replayUpgradedLog(header: JsonNode, entries: List<String>): GameState {
+internal fun replayUpgradedLog(
+    header: JsonNode,
+    entries: List<String>,
+    phaseOutcomesDeferred: Boolean = false,
+): GameState {
     val dataVersion = header.field("dataVersion").string()
     if (
         header.field("rulesVersion").string() !in setOf(RULES_VERSION, LEGACY_RULES_VERSION) ||
@@ -24,13 +28,21 @@ internal fun replayUpgradedLog(header: JsonNode, entries: List<String>): GameSta
             dataVersion = dataVersion,
             drawRenaissanceFromTurn =
                 header["drawRenaissanceFromTurn"]?.takeUnless(JsonNode::isNull)?.integer() ?: 1,
+            darkCaravanFromTurn =
+                header["darkCaravanFromTurn"]?.takeUnless(JsonNode::isNull)?.integer(),
         )
     try {
         if (entries.map(TextCodec::parse).map(Entry::toText) != entries) {
             throw ServiceFailure(422, "NONCANONICAL_LOG")
         }
         val state = replay(currentHeader, entries)
-        requireCompletedTransaction(state)
+        if (phaseOutcomesDeferred) {
+            require(state.stage.isTurnPhase && state.prompts().singleOrNull() is Prompt.System) {
+                "A deferred phase log must end with an authority request."
+            }
+        } else {
+            requireCompletedTransaction(state)
+        }
         return state
     } catch (failure: ServiceFailure) {
         throw failure
@@ -49,9 +61,16 @@ fun main(args: Array<String>) {
     val results = logs.map { log ->
         val id = log.field("id").string()
         val result = runCatching {
+            val boundary =
+                log["revisions"]?.array()?.lastOrNull { revision ->
+                    revision.field("entries").array().isNotEmpty() ||
+                        revision["replaceFrom"]?.isNull == false
+                }
             replayUpgradedLog(
                 log.field("header"),
                 log.field("entries").array().map(JsonNode::string),
+                phaseOutcomesDeferred =
+                    boundary?.let { it["defersPhaseOutcomes"] }?.boolean() == true,
             )
         }
         val description =

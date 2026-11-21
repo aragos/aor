@@ -20,7 +20,6 @@ export function finiteDecisions(snapshot: Snapshot): FiniteDecision[] {
             case 'patronize': return [{kind: 'patronage', subject: {kind: 'leader', id: subject}, command}];
             case 'swap-order': return [{kind: 'order-swap', subject: {kind: 'player', id: subject}, command}];
             case 'cancel-adjustment': return [{kind: 'cancellation', subject: {kind: 'commodity', id: subject.toUpperCase()}, command}];
-            case 'reduce-marker': return [{kind: 'secondary', subject: {kind: 'province', id: subject}, command}];
             case 'civil-war-loss': return [{kind: 'secondary', subject: {kind: 'loss', id: subject}, command}];
             default: return [];
         }

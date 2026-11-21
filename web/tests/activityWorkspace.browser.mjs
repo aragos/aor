@@ -23,7 +23,12 @@ export async function checkActivityWorkspace(page, web, baseline) {
         card: 'the-crusades', provinces: ['venice'], dice: [], target: null, amount: null, detail: null,
         competition: null, war: null, cashChanges: [], miseryChanges: [], tokenChanges: [],
         protectionCash: null, leaderRebate: null, drawReason: null, marketRoll: null, reliefPayment: null};
-    let fixture = {...baseline, events: Array.from({length: 50}, (_, index) => ({...source, id: `workspace-event-${index}`}))};
+    const mixedCard = {...source, id: 'mixed-commodity', card: 'cloth-wine', commodity: 'WINE', provinces: []};
+    const singleCard = {...source, id: 'single-commodity', card: 'stone-1', commodity: 'STONE', provinces: []};
+    let fixture = {...baseline, events: [
+        ...Array.from({length: 47}, (_, index) => ({...source, id: `workspace-event-${index}`})),
+        singleCard, mixedCard, {...source, id: 'workspace-event-latest'},
+    ]};
     async function poll() {
         fixture = {...fixture, revision: fixture.revision + 1};
         await page.evaluate(`window.setUiSnapshot(${JSON.stringify(fixture)})`);
@@ -34,6 +39,30 @@ export async function checkActivityWorkspace(page, web, baseline) {
     const settle = () => page.evaluate('document.fonts.ready.then(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))))');
     const bounds = selector => page.evaluate(`(() => {const r=document.querySelector(${JSON.stringify(selector)}).getBoundingClientRect();return {left:r.left,right:r.right,top:r.top,bottom:r.bottom,width:r.width,height:r.height};})()`);
     const selected = () => page.evaluate(`document.querySelector('[data-map-province="${offer.destination}"]').getAttribute('aria-pressed')`);
+    async function checkMixedCommodityHelp() {
+        const help = '[data-event-id="mixed-commodity"] .event-card .help-link';
+        const popup = '.reference-dialog[open]';
+        const choices = `${popup} .commodity-reference-choices button`;
+        assert.equal(await page.evaluate(`document.querySelectorAll('${help}').length`), 1, 'A mixed card has one help control');
+        await page.evaluate(`document.querySelector('${help}').focus()`);
+        await click(help);
+        await page.wait(`document.querySelector('${popup} #commodity-cloth .payout-box')`, 'Mixed card shows Cloth payouts');
+        assert.deepEqual(await page.evaluate(`[...document.querySelectorAll('${choices}')].map(button => button.textContent)`), ['Cloth', 'Wine']);
+        const wine = `${choices}:last-child`;
+        assert(await page.evaluate(`(() => {
+            const button = document.querySelector('${wine}');
+            const rect = button.getBoundingClientRect();
+            return button.contains(document.elementFromPoint(rect.x + rect.width / 2, rect.y + rect.height / 2));
+        })()`), 'The Wine choice is reachable within the popup');
+        await click(wine);
+        await page.wait(`document.querySelector('${popup} #commodity-wine .payout-box')`, 'Mixed card switches to Wine payouts');
+        await poll();
+        assert.equal(await page.evaluate(`document.querySelectorAll('${popup}').length`), 1, 'Switching and polling retain one dialog');
+        assert.equal(await page.evaluate(`document.querySelector('${wine}').getAttribute('aria-pressed')`), 'true');
+        await click(`${popup} .close-detail`);
+        assert(await page.evaluate(`document.activeElement.matches('${help}')`), 'Closing returns focus to the mixed card help');
+        assert.equal(await selected(), 'true', 'Commodity inspection preserves the prepared placement');
+    }
     await poll();
     await page.wait(`document.querySelector('#tab-map[aria-selected="true"]')`, 'Expansion starts on its map');
     assert.equal(await page.evaluate(`document.querySelector('.workspace-side .table-activity, .activity-toggle, .activity-resizer')`), null,
@@ -102,6 +131,11 @@ export async function checkActivityWorkspace(page, web, baseline) {
     assert.equal(await page.evaluate(`document.activeElement.matches('.event-card')`), true, 'Closing inspection returns focus to its activity card');
     assert.equal(await selected(), 'true', 'Inspection and polling preserve the prepared placement');
     assert.equal(await page.evaluate(`!!document.querySelector('[data-province-outline="${offer.destination}"][data-highlight-priority="4"]')`), true, 'Temporary card inspection preserves the prepared province border');
+    await checkMixedCommodityHelp();
+    await click('[data-event-id="single-commodity"] .event-card .help-link');
+    await page.wait(`document.querySelector('.reference-dialog #commodity-stone .payout-box')`, 'Single card opens directly to Stone payouts');
+    assert.equal(await page.evaluate(`document.querySelector('.reference-dialog .commodity-reference-choices')`), null);
+    await click('.reference-dialog .close-detail');
     const historyProvince = fixture.game.catalog.provinces.find(province => province.id === 'venice');
     const provinceLink = '[data-activity-province="venice"]';
     assert.deepEqual(await page.evaluate(`[...document.querySelector('${provinceLink}').parentElement.querySelectorAll('.commodity-name')].map(node => node.textContent.toUpperCase())`),
@@ -164,6 +198,7 @@ export async function checkActivityWorkspace(page, web, baseline) {
     assert.equal(await selected(), 'true', 'Narrow fallback retains the prepared placement');
     await poll();
     assert.equal(await page.evaluate(`document.querySelector('#tab-activity').getAttribute('aria-selected')`), 'true', 'Narrow polling leaves Activity selected');
+    await checkMixedCommodityHelp();
     if (process.env.AOR_BROWSER_ARTIFACTS) await page.viewportScreenshot(join(process.env.AOR_BROWSER_ARTIFACTS, 'aor-activity-phone.png'));
     const expandedPhoneActions = await bounds('.workspace-side');
     const expandedPhoneLog = await bounds('#workspace-activity');

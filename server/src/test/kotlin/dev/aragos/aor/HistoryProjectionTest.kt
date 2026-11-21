@@ -16,7 +16,15 @@ class HistoryProjectionTest {
             ),
             owner,
         )
-    private val state = GameState(header)
+    private val card = HandCard("held-card", CardData.definition("stone-1"))
+    private val state =
+        GameState(header).let { initial ->
+            initial.copy(
+                players =
+                    initial.players +
+                        (owner to initial.playerState(owner).copy(hand = listOf(card)))
+            )
+        }
 
     @Test
     fun projectedStateIncludesEveryRevisionDelta() {
@@ -102,15 +110,24 @@ class HistoryProjectionTest {
     }
 
     @Test
-    fun masterArtDiscardIsHiddenFromOtherPlayers() {
-        val entry = Entry.Action(owner, TurnCommand.DiscardCard("private-hand-reference"))
+    fun masterArtDiscardRevealsItsReferenceAndIdentityToEveryAudience() {
+        val entry = Entry.Action(owner, TurnCommand.DiscardCard(card.reference))
 
-        assertThat(HistoryProjection.line(state, entry, observer))
-            .isEqualTo("p1: discard-card <hidden>")
+        val lines =
+            listOf(owner, observer, null).map { viewer ->
+                HistoryProjection.line(state, entry, viewer)
+            }
+
+        assertThat(lines)
+            .containsExactly(
+                "p1: discard-card held-card [stone-1]",
+                "p1: discard-card held-card [stone-1]",
+                "p1: discard-card held-card [stone-1]",
+            )
     }
 
     @Test
-    fun spectatorsNeverReceivePrivateDrawTradeDiscardOrOfferIdentities() {
+    fun spectatorsNeverReceivePrivateDrawTradeOrOfferIdentities() {
         val trade =
             state.copy(
                 flow = TurnFlow(decisions = listOf(BoardDecision.TradeOffer(owner, recipient)))
@@ -119,7 +136,6 @@ class HistoryProjectionTest {
             listOf(
                 GameOutcome.Draw(owner, "private-hand-reference", "stone-1"),
                 GameOutcome.Trade(owner, recipient, "private-hand-reference"),
-                Entry.Action(owner, TurnCommand.DiscardCard("private-hand-reference")),
                 Entry.Action(owner, BoardCommand.OfferCard("private-hand-reference")),
             )
 
@@ -129,17 +145,9 @@ class HistoryProjectionTest {
             .containsExactly(
                 "!draw p1 private-hand-reference <hidden>",
                 "!trade p1 p2 <hidden>",
-                "p1: discard-card <hidden>",
                 "p1: offer-card <hidden>",
             )
             .inOrder()
-    }
-
-    @Test
-    fun masterArtDiscardRemainsVisibleToItsOwner() {
-        val entry = Entry.Action(owner, TurnCommand.DiscardCard("private-hand-reference"))
-
-        assertThat(HistoryProjection.line(state, entry, owner)).isEqualTo(entry.toText())
     }
 
     @Test

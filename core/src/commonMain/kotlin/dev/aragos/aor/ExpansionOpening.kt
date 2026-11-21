@@ -1,5 +1,10 @@
 package dev.aragos.aor
 
+/** Expansion tax or award per active opponent across the ownership boundary. */
+object HolyIndulgence {
+    const val TOKENS_PER_RIVAL = 2
+}
+
 /** Holy Indulgence applies only between active players; Chaos pieces are neutral. */
 internal fun GameState.applyHolyIndulgence(): GameState {
     val active = playerIds.filter { id -> playerState(id).misery != MiseryStep.CHAOS }
@@ -8,7 +13,7 @@ internal fun GameState.applyHolyIndulgence(): GameState {
     return active.fold(this) { state, id ->
         val player = state.playerState(id)
         if (id in owners) {
-            val required = nonOwners.size * 2
+            val required = nonOwners.size * HolyIndulgence.TOKENS_PER_RIVAL
             val moved = minOf(player.stockTokens, required)
             state.replacePlayer(
                 player.copy(
@@ -18,7 +23,7 @@ internal fun GameState.applyHolyIndulgence(): GameState {
                 )
             )
         } else {
-            val required = owners.size * 2
+            val required = owners.size * HolyIndulgence.TOKENS_PER_RIVAL
             val moved = minOf(player.poolTokens, required)
             val cost = required - moved
             val unpaid = (cost - player.cash).coerceAtLeast(0)

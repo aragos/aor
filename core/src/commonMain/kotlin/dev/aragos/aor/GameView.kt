@@ -22,6 +22,10 @@ data class PlayerView(
     val income: IncomeView? = null,
     /** A revealed expansion pool still usable this turn, including an empty pool. */
     val poolAvailable: Boolean = false,
+    /**
+     * Further distinct overseas presences allowed by fleet size; route/access checks still apply.
+     */
+    val overseasSlots: Int = 0,
 ) {
     val stockMarkers: Int
         get() = 25 - boardMarkers
@@ -50,6 +54,13 @@ data class PlayerView(
                         state.stage in Stage.DRAW_CARD..Stage.EXPANSION) &&
                         !expansionFinished &&
                         player.misery != MiseryStep.CHAOS,
+                overseasSlots =
+                    ExpansionReach.remainingOverseasSlots(
+                        state.catalog,
+                        state.board,
+                        player.player.id,
+                        player.ships,
+                    ),
             )
         }
     }
@@ -81,7 +92,9 @@ data class GameView(
     val catalog: PublicCatalog? = null,
     val activity: ActivityView? = null,
     val deckRemaining: Int = 0,
-    /** Introduced cards not publicly played in this epoch, including hands and private discards. */
+    /**
+     * Introduced cards not publicly played or discarded this epoch, including hidden hand losses.
+     */
     val unplayedCards: List<CardDefinition> = emptyList(),
     val endingTriggered: Boolean = false,
     val scores: List<ScoreView> = emptyList(),
@@ -108,6 +121,8 @@ data class GameView(
     val stabilizationMisery: Int? = null,
     val burdenReferences: Set<String> = emptySet(),
     val expansionOffers: List<ExpansionOfferView> = emptyList(),
+    /** Current-capability forecasts before Expansion, separate from executable action offers. */
+    val expansionForecast: ExpansionForecastView? = null,
     val markerReductionOffers: List<MarkerReductionOfferView> = emptyList(),
     /** Destination diagnostics include pool/shipping failures omitted from [expansionOffers]. */
     val expansionInspections: List<ExpansionOfferView> = emptyList(),
@@ -122,19 +137,34 @@ data class GameView(
     /** Pool-token cost for the viewer's current Expansion offer; never a cash price. */
     val expansionCardCost: Int? = null,
     val playedLeaderDiscounts: List<PlayedLeaderDiscountView> = emptyList(),
+    /** Informational next-purchase quote during ordinary card play; never a command offer. */
+    val purchaseShippingForecast: ShippingOfferView? = null,
     val unplayedAdvanceLeaders: List<AdvanceLeaderAvailabilityView> = emptyList(),
     val windmillOffer: WindmillOfferView? = null,
+    /** Signed bids from up to eight completed prior turns, oldest first; only at token bidding. */
+    val pastTokenPurchases: List<Map<PlayerId, Int>> = emptyList(),
 ) {
+    /** Public fields reused by full and decision-only views of the same immutable state. */
+    internal class Common(state: GameState) {
+        val activity: ActivityView = ActivityView.from(state)
+        val board: List<ProvinceView> =
+            state.board.pieces.map { (province, pieces) -> ProvinceView.from(province, pieces) }
+        val catalog: PublicCatalog = PublicCatalog.from(state.catalog)
+        val scores: List<ScoreView> = ScoreView.from(state)
+        val commodityPayouts: List<CommodityPayoutView> by lazy { CommodityPayoutView.from(state) }
+        val unplayedCards: List<CardDefinition> by lazy { CardAvailability.unplayed(state) }
+    }
+
     companion object {
         internal fun forViewer(
             state: GameState,
             viewer: PlayerState?,
             decisionOnly: Boolean = false,
         ): GameView {
-            val decision = ActivityView.from(state).choice
+            val common = state.commonView
+            val decision = common.activity.choice
             fun needed(vararg choices: String): Boolean = !decisionOnly || decision in choices
-            val expansionInspections =
-                viewer?.let { ExpansionProjection.inspections(state, it) }.orEmpty()
+            val expansion = state.expansionQuotesFor(viewer?.player?.id)
             return GameView(
                 stage = state.stage,
                 currentEpoch = state.currentEpoch.number,
@@ -153,17 +183,12 @@ data class GameView(
                 turnOrder = state.turnOrder,
                 orderBoxes = state.orderBoxes,
                 revealedTokenPurchases = TurnOrderProjection.revealedPurchases(state),
+                pastTokenPurchases =
+                    if (state.stage == Stage.TOKEN_PURCHASE) state.recentTokenPurchases
+                    else emptyList(),
                 provisionalTieOrder = state.turnOrderSelection.ties.firstOrNull()?.placed.orEmpty(),
-                board =
-                    state.board.pieces.map { (province, pieces) ->
-                        ProvinceView.from(province, pieces)
-                    },
-                catalog =
-                    PublicCatalog.forPlayers(
-                        state.playerIds.size,
-                        state.rules,
-                        state.catalog.version,
-                    ),
+                board = common.board,
+                catalog = common.catalog,
                 lockedProvinces =
                     viewer
                         .takeUnless { decisionOnly }
@@ -178,11 +203,11 @@ data class GameView(
                                 .toSet()
                         }
                         .orEmpty(),
-                activity = ActivityView.from(state),
+                activity = common.activity,
                 deckRemaining = state.deck.size,
-                unplayedCards = if (decisionOnly) emptyList() else CardAvailability.unplayed(state),
+                unplayedCards = if (decisionOnly) emptyList() else common.unplayedCards,
                 endingTriggered = state.endingTriggered,
-                scores = ScoreView.from(state),
+                scores = common.scores,
                 adjustments = state.adjustments,
                 effects = state.effects,
                 cathedralPairs = CathedralPairView.from(state),
@@ -202,7 +227,7 @@ data class GameView(
                                 card.definition.id == EventId.PIRATES_VIKINGS.cardId
                             } == true
                     ) {
-                        val context = state.cardContext()
+                        val context = state.cardContext
                         PirateTargetsView(
                             CardRules.piratesRequiredCount(context),
                             CardRules.pirateTargets(context),
@@ -211,7 +236,11 @@ data class GameView(
                 voids = state.voids,
                 advanceOffers =
                     viewer
-                        ?.takeIf { needed("purchase-advances") }
+                        ?.takeIf {
+                            needed("purchase-advances", "purchase-shipping") ||
+                                needed("play-cards") &&
+                                    it.hand.any { card -> card.definition.kind == CardKind.LEADER }
+                        }
                         ?.let { advanceOffers(state, it) }
                         .orEmpty(),
                 patronageOffers =
@@ -245,16 +274,28 @@ data class GameView(
                             .value
                     },
                 burdenReferences = viewer?.let { burdenReferences(state, it) }.orEmpty(),
-                expansionOffers = ExpansionProjection.offers(expansionInspections),
+                expansionOffers = expansion.offers,
+                expansionForecast =
+                    viewer
+                        ?.takeIf {
+                            state.stage == Stage.TOKEN_PURCHASE && needed("buy-tokens") ||
+                                needed("play-cards") &&
+                                    it.hand.any { card ->
+                                        CardEffectData.forCard(card.definition.id) is
+                                            CardEffectSpec.CommodityChoices
+                                    }
+                        }
+                        ?.let { ExpansionForecastView.from(state, it) },
                 markerReductionOffers =
                     viewer
                         ?.takeIf { !decisionOnly || state.board.markerCount(it.player.id) == 25 }
                         ?.let { ExpansionProjection.reductions(state, it) }
                         .orEmpty(),
-                expansionInspections = expansionInspections,
+                expansionInspections = expansion.inspections,
                 commodityPayouts =
                     if (
                         needed(
+                            "buy-tokens",
                             "expand",
                             "play-cards",
                             "prepare-war",
@@ -265,10 +306,14 @@ data class GameView(
                             "place-event-marker",
                         )
                     ) {
-                        CommodityPayoutView.from(state)
+                        common.commodityPayouts
                     } else emptyList(),
                 commodityCards =
-                    if (decisionOnly) emptyList() else CommodityCardCountView.from(state),
+                    if (needed("play-cards", "expand", "buy-tokens")) {
+                        CommodityCardCountView.from(state)
+                    } else {
+                        emptyList()
+                    },
                 cardOffers =
                     viewer
                         ?.takeIf { needed("play-cards", "prepare-war") }
@@ -280,6 +325,14 @@ data class GameView(
                 tokenPurchaseOffers =
                     viewer?.let { TokenPurchaseProjection.offers(state, it) }.orEmpty(),
                 shippingOffer = viewer?.let { ShippingOfferView.from(state, it) },
+                purchaseShippingForecast =
+                    viewer
+                        ?.takeIf {
+                            state.stage == Stage.PLAY_CARDS &&
+                                needed("play-cards") &&
+                                it.hand.any { card -> card.definition.kind == CardKind.LEADER }
+                        }
+                        ?.let { ShippingOfferView.forecast(state, it) },
                 expansionCardCost =
                     if (
                         state.stage == Stage.EXPANSION &&
@@ -313,7 +366,7 @@ data class GameView(
 
         private fun burdenReferences(state: GameState, viewer: PlayerState): Set<String> {
             if (state.turnNumber == null || viewer.hand.isEmpty()) return emptySet()
-            val context = state.cardContext()
+            val context = state.cardContext
             return viewer.hand
                 .filter { card -> CardRules.isBurden(context, card.definition.id) }
                 .map(HandCard::reference)
@@ -379,7 +432,7 @@ data class WarCessionView(
         internal fun from(state: GameState): WarCessionView? {
             val decision =
                 state.flow.decisions.lastOrNull() as? CardDecision.WarSurrender ?: return null
-            val context = state.cardContext()
+            val context = state.cardContext
             val victory = decision.victory
             val eligible = WarRules.eligibleProvinces(context, victory.winner, victory.loser)
             val capacity = WarRules.overseasCapacity(context, victory.winner)
@@ -497,8 +550,10 @@ data class PublicCatalog(
             playerCount: Int,
             rules: RuleOptions = RuleOptions(),
             version: CatalogVersion = CatalogVersion.CATALOG_16,
-        ): PublicCatalog {
-            val configuration = CatalogConfiguration(playerCount, rules, version)
+        ): PublicCatalog = from(CatalogConfiguration(playerCount, rules, version))
+
+        internal fun from(configuration: CatalogConfiguration): PublicCatalog {
+            val playerCount = configuration.playerCount
             return PublicCatalog(
                 configuration.provinces,
                 AdvanceData.definitions,
@@ -521,10 +576,13 @@ data class PublicCatalog(
                         greenWins = CompetitionRules.greenWinningRolls(box),
                     )
                 },
-                dataVersion = version.wireValue,
+                dataVersion = configuration.version.wireValue,
                 commodityCards =
                     configuration.commodities.map { commodity ->
-                        CommodityCardCountView(commodity.id, commodity.cardsByEpoch(rules))
+                        CommodityCardCountView(
+                            commodity.id,
+                            commodity.cardsByEpoch(configuration.rules),
+                        )
                     },
             )
         }

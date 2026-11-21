@@ -1,6 +1,7 @@
 package dev.aragos.aor
 
-import dev.aragos.aor.ai.BOT_POLICY_VERSION
+import dev.aragos.aor.ai.BotDifficulty
+import dev.aragos.aor.ai.HARD_AUTOMATA_VERSION
 import java.security.MessageDigest
 import java.security.SecureRandom
 import java.util.Base64
@@ -87,6 +88,7 @@ class GameService(
         undoPolicy: UndoPolicy = UndoPolicy.REGULAR_TURN,
         name: GameName = GameName.DEFAULT,
         bots: List<AutomatedPlayerRequest> = emptyList(),
+        pauseAfterPhase: Boolean = false,
     ): CreatedGame {
         val normalized = names.map(String::trim) + bots.map(AutomatedPlayerRequest::name)
         if (names.isEmpty() || names.size + bots.size !in 3..6) {
@@ -127,8 +129,11 @@ class GameService(
                 )
                 .copy(
                     name = name,
-                    bots = botSeats(players.drop(names.size), bots),
-                    botRunner = BotRunnerState().takeIf { bots.isNotEmpty() },
+                    bots = botSeats(players.drop(names.size)),
+                    botRunner =
+                        BotRunnerState(pauseAfterPhase = pauseAfterPhase).takeIf {
+                            bots.isNotEmpty()
+                        },
                 )
         )
         return CreatedGame(
@@ -157,6 +162,7 @@ class GameService(
         policy: UndoPolicy,
         name: GameName = GameName.DEFAULT,
         bots: List<AutomatedPlayerRequest> = emptyList(),
+        pauseAfterPhase: Boolean = false,
     ): CreatedGame {
         if (
             players.size + bots.size !in 3..6 ||
@@ -187,8 +193,11 @@ class GameService(
                 .copy(
                     name = name,
                     memberships = seats.associate { (seat, account) -> seat to account.id.value },
-                    bots = botSeats(header.players.drop(players.size), bots),
-                    botRunner = BotRunnerState().takeIf { bots.isNotEmpty() },
+                    bots = botSeats(header.players.drop(players.size)),
+                    botRunner =
+                        BotRunnerState(pauseAfterPhase = pauseAfterPhase).takeIf {
+                            bots.isNotEmpty()
+                        },
                 )
         )
         val creatorName = header.players.single { it.id == creatorId }.name
@@ -802,13 +811,14 @@ class GameService(
     internal fun authenticate(stored: StoredGame, access: GameAccess): PlayerId =
         viewer(stored, access) ?: throw ServiceFailure(403, "GAME_MEMBERSHIP_REQUIRED")
 
-    private fun botSeats(
-        players: List<Player>,
-        requests: List<AutomatedPlayerRequest>,
-    ): Map<PlayerId, AutomatedPlayer> =
-        players.zip(requests).associate { (player, request) ->
+    private fun botSeats(players: List<Player>): Map<PlayerId, AutomatedPlayer> =
+        players.associate { player ->
             player.id to
-                AutomatedPlayer(request.difficulty, BOT_POLICY_VERSION, credentialsRandom.nextInt())
+                AutomatedPlayer(
+                    BotDifficulty.HARD,
+                    HARD_AUTOMATA_VERSION,
+                    credentialsRandom.nextInt(),
+                )
         }
 
     private fun authenticateSeat(stored: StoredGame, token: String): PlayerId {

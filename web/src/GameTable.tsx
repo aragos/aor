@@ -1,6 +1,5 @@
 import {useEffect, useLayoutEffect, useRef, useState} from 'react';
-import type {ReactNode} from 'react';
-import type {ApiError, Snapshot, RewindTarget, TokenPurchaseQuoteResponse} from './api';
+import type {ApiError, Snapshot, TokenPurchaseQuoteResponse} from './api';
 import {LabelMessage, PlayerLabel, PlayerLabels, ProvinceLabel} from './IdentityLabel';
 import {label, purchasePassLabel} from './labels';
 import {t} from './messages';
@@ -10,6 +9,9 @@ import {CommandDock} from './CommandDock';
 import {TableTools} from './TableTools';
 import {Activity, ActionResultNotice} from './Activity';
 import {TableIcon} from './TableIcon';
+import {PhaseTimeline} from './PhaseTimeline';
+import {BotControls, BotPhasePause} from './ai/BotControls';
+import type {BotControlState} from './ai/BotControls';
 import {FinalScores} from './FullGamePanels';
 import {AdvanceTiles, PlayerOverview, Markets} from './TablePanels';
 import {Hand} from './Hand';
@@ -32,7 +34,8 @@ import {PersonalOptions, usePersonalOptions} from './PersonalOptions';
 import {useStoredSetting} from './preferences';
 import {AbandonmentStatus, AbandonmentTools} from './Abandonment';
 import type {WriteAbandonment} from './Abandonment';
-import {RewindReview} from './RewindReview';
+import {UndoControls} from './RewindReview';
+import {MarkerReduction} from './GameActions';
 import type {LoadRewindTargets} from './RewindReview';
 
 export type PurchaseQuote = TokenPurchaseQuoteResponse;
@@ -41,12 +44,12 @@ export type QuotePurchase = (amount: number) => Promise<PurchaseQuote>;
 const ACTIVITY_PIN_QUERY = '(min-width: 1400px)';
 const MOBILE_QUERY = '(max-width: 700px)';
 
-export function GameTable({snapshot: liveSnapshot, busy: requestBusy, saved, submit: sendCommand, connectionError, actionError, quotePurchase, editHistory, writePlan, quotePlan, loadRewindTargets, writeAbandonment, botControls}: {
-    snapshot: Snapshot; busy: boolean; saved: boolean; submit: (command: string) => Promise<boolean>;
+export function GameTable({snapshot: liveSnapshot, busy: requestBusy, submit: sendCommand, connectionError, actionError, quotePurchase, editHistory, writePlan, quotePlan, loadRewindTargets, writeAbandonment, botAutomation}: {
+    snapshot: Snapshot; busy: boolean; submit: (command: string) => Promise<boolean>;
     connectionError: string; actionError: ApiError | null; quotePurchase: QuotePurchase;
     editHistory?: (fromEntry: number, lines: string[]) => Promise<boolean>;
     writePlan?: WritePlan; quotePlan?: QuotePlan; loadRewindTargets?: LoadRewindTargets; writeAbandonment?: WriteAbandonment;
-    botControls?: ReactNode;
+    botAutomation?: BotControlState;
 }) {
     const personalOptions = usePersonalOptions(liveSnapshot, requestBusy, sendCommand);
     const planner = useActivityPlanner(liveSnapshot, writePlan, quotePlan);
@@ -55,10 +58,10 @@ export function GameTable({snapshot: liveSnapshot, busy: requestBusy, saved, sub
         !!liveSnapshot.planning?.saved?.armed && liveSnapshot.prompt?.messageId !== 'prompt.renaissance';
     const actuallyActing = liveSnapshot.viewerId !== null && (liveSnapshot.prompt?.players.includes(liveSnapshot.viewerId) ?? false);
     const spectator = snapshot.viewerId === null;
+    const showPhasePause = !actuallyActing && !!liveSnapshot.automation?.pausedAfterPhase;
     const [expansionPass, setExpansionPass] = useState<number | null>(null);
-    const [rewindTarget, setRewindTarget] = useState<RewindTarget | null>(null);
-    useEffect(() => {if (liveSnapshot.status && liveSnapshot.status !== 'ACTIVE') setRewindTarget(null);}, [liveSnapshot.status]);
     const [mapControlsHost, setMapControlsHost] = useState<HTMLDivElement | null>(null);
+    const [mapExpanded, setMapExpanded] = useState(false);
     const [scoresOpen, setScoresOpen] = useState(snapshot.game.stage === 'FINISHED');
     const finished = snapshot.game.stage === 'FINISHED';
     useEffect(() => setScoresOpen(finished), [finished]);
@@ -87,6 +90,8 @@ export function GameTable({snapshot: liveSnapshot, busy: requestBusy, saved, sub
     useEffect(() => {
         if (!mobile && workspace === 'players') setWorkspace('map');
     }, [mobile, setWorkspace, workspace]);
+    const expandedMap = !mobile && workspace === 'map' && mapExpanded;
+    const mapSizeLabel = t(expandedMap ? 'board.minimizeMap' : 'board.expandMap');
     const activityPinned = pinActivity && wideScreen;
     const actionsCollapsed = mobile && sheetCollapsed;
     const previousWorkspace = useRef<Exclude<Workspace, 'activity'>>('map');
@@ -98,6 +103,15 @@ export function GameTable({snapshot: liveSnapshot, busy: requestBusy, saved, sub
         'map', 'markets', 'advances', ...(activityPinned ? [] : ['activity'] as const),
         ...(mobile ? ['players'] as const : []),
     ];
+    function openActivity() {
+        if (activityPinned) {
+            setMapExpanded(false);
+            requestAnimationFrame(() => document.getElementById('workspace-activity')?.focus());
+        } else {
+            setWorkspace('activity');
+            document.getElementById('tab-activity')?.focus();
+        }
+    }
     function toggleActivityPin() {
         setPinActivity(!activityPinned);
         setWorkspace(activityPinned ? 'activity' : previousWorkspace.current);
@@ -107,7 +121,9 @@ export function GameTable({snapshot: liveSnapshot, busy: requestBusy, saved, sub
         : decisionIdentity(snapshot);
     const decisionScroll = useRef<HTMLDivElement>(null);
     useLayoutEffect(() => {
-        if (selectedAction && decisionScroll.current) decisionScroll.current.scrollTop = 0;
+        if (selectedAction && !selectedAction.startsWith('reduce-marker ') && decisionScroll.current) {
+            decisionScroll.current.scrollTop = 0;
+        }
     }, [selectedAction]);
     // Reset before new forms activate their automatic target pickers.
     useLayoutEffect(() => {
@@ -166,7 +182,8 @@ export function GameTable({snapshot: liveSnapshot, busy: requestBusy, saved, sub
     const expansionOffer = expanding && !picker
         ? snapshot.game.expansionOffers.find(offer => offer.destination === selected && offer.primaryAction !== 'INSPECT') : undefined;
     const reductionOffer = snapshot.game.markerReductionOffers?.find(offer => offer.command === selectedAction);
-    const poolAfter = reductionOffer?.poolAfter ?? maximumPartialPlacement(expansionOffer)?.resultingPool ?? expansionOffer?.resultingPool;
+    const reducedPool = reductionOffer && reductionOffer.poolAfter !== reductionOffer.poolBefore ? reductionOffer.poolAfter : undefined;
+    const poolAfter = reducedPool ?? maximumPartialPlacement(expansionOffer)?.resultingPool ?? expansionOffer?.resultingPool;
     const cardAction = !spectator && selectedCard && snapshot.game.cardOffers.some(offer => offer.reference === selectedCard && offer.playable);
     const advance = snapshot.game.catalog?.advances.find(candidate => candidate.id === selectedAdvance);
     const advanceAction = !spectator && advance && snapshot.legalChoices.commands.includes(`buy-advance ${advance.letter}`);
@@ -185,10 +202,6 @@ export function GameTable({snapshot: liveSnapshot, busy: requestBusy, saved, sub
         (!!cardAction && snapshot.game.cardOffers.some(offer => offer.reference === selectedCard && offer.protectionMax !== null))));
     const hasContext = !!(cardAction || advanceAction || selectedAction || (province && !picker && expanding));
     const objectAction = !!(cardAction || advanceAction);
-    const withdrawing = snapshot.legalChoices.commands.includes('withdraw-bid');
-    const undoDescription = withdrawing
-        ? t(snapshot.game.stage === 'TOKEN_PURCHASE' ? 'controls.withdrawPurchase' : 'controls.withdrawBid')
-        : t('history.undo');
     const selectedName = selectedCard ? snapshot.game.hand.find(card => card.reference === selectedCard)?.definition.messageId : null;
     const prompt = snapshot.prompt?.messageId.slice('prompt.'.length);
     const competitionProvince = snapshot.game.activity?.competitionProvince;
@@ -203,10 +216,9 @@ export function GameTable({snapshot: liveSnapshot, busy: requestBusy, saved, sub
                 <dt>{t(`option.${option.key}`)}</dt><dd>{t(`optionValue.${option.value}`)}</dd>
             </div>)}</dl>
             {writeAbandonment && <AbandonmentTools snapshot={liveSnapshot} busy={requestBusy} write={writeAbandonment}/>}
-            {botControls}
+            {botAutomation && <BotControls snapshot={liveSnapshot} {...botAutomation}/>}
         </div>}
-        commands={!spectator && <CommandDock snapshot={snapshot} busy={busy} submit={submit} editHistory={editHistory}
-            loadRewindTargets={loadRewindTargets} reviewRewind={setRewindTarget}/>}/>;
+        commands={!spectator && <CommandDock snapshot={snapshot} busy={busy} submit={submit} editHistory={editHistory}/>}/>;
     return <ReferenceCatalogContext.Provider value={snapshot.game.catalog}>
         <ReferenceGameContext.Provider value={{viewerId: liveSnapshot.viewerId,
             players: liveSnapshot.game.players.every(player => player.capital !== null) ? liveSnapshot.game.players : [], turnOrder: liveSnapshot.game.turnOrder,
@@ -221,13 +233,11 @@ export function GameTable({snapshot: liveSnapshot, busy: requestBusy, saved, sub
                 if (await submit('pass', true)) setExpansionPass(null);
             }}>{t('controls.passAnyway')}</button><button type="button" className="secondary" onClick={() => setExpansionPass(null)}>{t('abandonment.back')}</button></div>
         </CardInspectionDialog>}
-        {rewindTarget && <RewindReview snapshot={liveSnapshot} target={rewindTarget} busy={busy}
-            close={() => setRewindTarget(null)} submit={submit}/>}
         <div className="table-overview">
             <header className="game-header">
                 <div className="game-brand"><h1><a className="games-home" href="/play" aria-label={t('hosted.my-games')}><AppLogo/></a></h1><div className="game-heading"><strong className="game-name" title={snapshot.name}>{snapshot.name}</strong>
                     <p>{snapshot.game.turnNumber !== null && `${t('game.turn')} ${snapshot.game.turnNumber} · `}{snapshot.game.endingTriggered && !finished && <span className="ending-status" role="status" title={t('game.endingNotice')}>{t('game.finalTurn')} · </span>}<span className="epoch-progress"><HelpLink topic="unplayed-cards" compact={false} label={t('reference.unplayedCardsTitle')}>{t('game.epochProgress', {epoch: snapshot.game.currentEpoch, cards: snapshot.game.deckRemaining})}</HelpLink></span></p></div></div>
-                <div className="header-stage"><strong>{t(`stage.${snapshot.game.stage}`)}</strong>{spectator && <span className="spectator-status">{t('table.spectating')}</span>}</div>
+                <PhaseTimeline stage={liveSnapshot.game.stage} spectator={spectator}/>
                 {me && !snapshot.accountId && <details className="private-seat-link"><summary>{t('links.yourSeat').replace('{name}', me.name)}</summary>
                     <p>{t('links.keepPrivate')}</p><a className="button secondary" download="aor-private-seat.txt"
                         href={`data:text/plain;charset=utf-8,${encodeURIComponent(`${me.name}\n${window.location.href}\n`)}`}>{t('links.save')}</a>
@@ -235,10 +245,14 @@ export function GameTable({snapshot: liveSnapshot, busy: requestBusy, saved, sub
                 {finished && <button type="button" className="secondary final-scores-toggle" onClick={() => setScoresOpen(true)}>{t('game.finalScores')}</button>}
                 <AccountControls showGames={false}/>
             </header>
+            {liveSnapshot.status === 'ACTIVE' && !finished && showPhasePause &&
+                workspace !== 'activity' && (!activityPinned || expandedMap) &&
+                <button type="button" className="secondary bot-activity-shortcut" aria-controls="workspace-activity"
+                    onClick={openActivity}>{t('bots.viewActivity')}</button>}
             {inactive && <p className="ending-notice" role="status">{snapshot.status === 'ABANDONED' && snapshot.events.some(event => event.kind === 'ABANDONMENT_AGREE' && event.detail === 'UNANIMOUS') ? t('abandonment.ended') : t('hosted.inactive', {status: t(`gameStatus.${snapshot.status}`).toLowerCase()})}</p>}
             {connectionError && <p className="error connection-error" role="alert">{t(`error.${connectionError}`)}</p>}
         </div>
-        <div className="table-workspace" data-activity-pinned={activityPinned}>
+        <div className="table-workspace" data-activity-pinned={activityPinned && !expandedMap} data-map-expanded={expandedMap}>
             <section id="workspace-players" className="players-workspace" hidden={mobile && workspace !== 'players'}
                 role={mobile ? 'tabpanel' : 'region'} aria-label={mobile ? undefined : t('table.players')}
                 aria-labelledby={mobile ? 'tab-players' : undefined}>
@@ -263,6 +277,11 @@ export function GameTable({snapshot: liveSnapshot, busy: requestBusy, saved, sub
                         }}><TableIcon kind={tab === 'markets' ? 'commodities' : tab}/><span>{t(`table.${tab}`)}</span>{tab === 'advances' && me && <small>{me.advances.length}</small>}</button>)}
                 </nav>
                 <div className="map-controls" ref={setMapControlsHost} hidden={workspace !== 'map'}/>
+                {!mobile && workspace === 'map' && <button type="button" className="secondary map-size-toggle"
+                    title={mapSizeLabel} aria-label={mapSizeLabel} aria-expanded={expandedMap}
+                    aria-controls="workspace-map" onClick={() => setMapExpanded(current => !current)}>
+                    <TableIcon kind={expandedMap ? 'minimize' : 'expand'}/>
+                </button>}
             </div>
             <div className="workspace-main" hidden={workspace === 'activity' || workspace === 'players'}>
                 <div id="workspace-map" role="tabpanel" aria-labelledby="tab-map" hidden={workspace !== 'map'}>
@@ -277,20 +296,20 @@ export function GameTable({snapshot: liveSnapshot, busy: requestBusy, saved, sub
                 </section>}
             </div>
             <Activity snapshot={liveSnapshot} onInspectCard={id => setInspection({kind: 'history-card', id})}
-                active={workspace === 'activity'} pinned={activityPinned} canPin={wideScreen} onTogglePin={toggleActivityPin}/>
-            <div className="workspace-side">
-                <aside className={`decision-panel decision ${hasContext ? 'has-context' : ''} ${actionsCollapsed ? 'sheet-collapsed' : ''}`} aria-label={t(spectator ? 'table.spectatorView' : 'table.currentDecision')}>
+                active={workspace === 'activity'} pinned={activityPinned && !expandedMap} canPin={wideScreen} onTogglePin={toggleActivityPin}
+                phasePause={showPhasePause && <BotPhasePause snapshot={liveSnapshot} controls={botAutomation}/>}/>
+            <div className="workspace-side" hidden={expandedMap}>
+                <aside className={`decision-panel decision ${hasContext ? 'has-context' : ''} ${actionsCollapsed ? 'sheet-collapsed' : ''}`} aria-label={t(spectator ? 'table.spectatorView' : 'table.currentDecision')}
+                    data-action-ready={actuallyActing && !inactive && !finished}>
                     <DecisionActions pass={!spectator && !inactive && canAct && snapshot.legalChoices.commands.includes('pass') &&
                         <button type="button" className={`pass-action ${snapshot.prompt?.messageId.startsWith('prompt.purchase-') ? 'purchase-continuation' : ''} ${snapshot.prompt?.messageId === 'prompt.renaissance' ? 'renaissance-pass' : ''}`} disabled={busy} onClick={() => { void submit('pass'); }}>{planner.open && <>{t('plan.add')} · </>}{purchasePassLabel(snapshot)}</button>}>
                     <div className={`decision-toolbar ${objectAction ? 'object-heading' : ''}`}>
-                        <h2 id="decision-title" aria-live="polite" aria-atomic="true">{objectAction ? selectedName ? t(selectedName) : label(selectedAdvance, 'advance') : decision}</h2>
-                        {!spectator && !inactive && !planner.open && (withdrawing || snapshot.undo?.available) && <button type="button"
-                            className={`secondary undo-action ${withdrawing ? 'withdraw-bid' : ''}`} disabled={busy}
-                            title={undoDescription} aria-label={withdrawing ? `${t('history.undo')}: ${undoDescription}` : undoDescription}
-                            onClick={() => {
-                                if (!withdrawing && snapshot.undo.capability === 'PREFIX_REWIND' && snapshot.undo.latestTarget) setRewindTarget(snapshot.undo.latestTarget);
-                                else void submit(withdrawing ? 'withdraw-bid' : 'undo');
-                            }}>{t('history.undo')}</button>}
+                        <div className="decision-title-group">
+                            {objectAction && <span className="decision-action-label">{decision}</span>}
+                            <h2 id="decision-title" aria-live="polite" aria-atomic="true">{objectAction ? selectedName ? t(selectedName) : label(selectedAdvance, 'advance') : decision}</h2>
+                        </div>
+                        {!spectator && !inactive && !planner.open && <UndoControls snapshot={liveSnapshot}
+                            busy={busy} submit={submit} load={loadRewindTargets} actionError={actionError}/>}
                         {mobile && <button type="button" className="secondary sheet-toggle" aria-expanded={!actionsCollapsed}
                             aria-controls="decision-review decision-footer" onClick={() => setSheetCollapsed(current => !current)}>
                             {t(actionsCollapsed ? 'table.expandDecision' : 'table.minimizeDecision')}
@@ -325,13 +344,15 @@ export function GameTable({snapshot: liveSnapshot, busy: requestBusy, saved, sub
                     {!spectator && !inactive && <ActivityPlanner snapshot={liveSnapshot} planner={planner} busy={requestBusy}/>}
                     {spending && me && <p className="action-cash">{t('controls.availableCash')}: <strong>${me.cash}</strong></p>}
                     {buyingAdvances && !advanceAction && <p className="relief-rating-summary advance-relief-rating"><span>{t('controls.reliefRatingAvailable')}</span><strong>${snapshot.game.reliefRatingAvailable}</strong></p>}
-                    <PlanningActions active={planner.open}>{cardAction ? <CardDecision key={selectedCard} mode="action" snapshot={snapshot} busy={busy} submit={submit}/>
+                    <PlanningActions active={planner.open}>
+                    {expanding && prompt === 'expand' && !inactive && <MarkerReduction key={`marker-reduction:${decisionKey}`} snapshot={snapshot} busy={busy} submit={submit}/>}
+                    {cardAction ? <CardDecision key={selectedCard} mode="action" snapshot={snapshot} busy={busy} submit={submit}/>
                         : advanceAction ? <AdvanceDecision mode="action" snapshot={snapshot} busy={busy} submit={submit}/>
                         : province && !picker && <ProvinceActions key={province.id} snapshot={snapshot} province={province} busy={busy} submit={submit}/>}
                     {!spectator && !inactive && <Controls key={decisionKey} snapshot={snapshot} busy={busy} submit={submit} quotePurchase={quotePurchase}/>}
                     </PlanningActions>
                     {actionError && <DiagnosticMessage failure={actionError} snapshot={snapshot}/>}
-                    {(requestBusy || saved && !planner.supported && !['BIDDING', 'TOKEN_PURCHASE'].includes(snapshot.game.stage)) && <p className="save-status" aria-live="polite">{t(requestBusy ? 'status.working' : 'status.saved')}</p>}
+                    {requestBusy && <p className="save-status" aria-live="polite">{t('status.working')}</p>}
                     </div>
                     </div>
 

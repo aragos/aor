@@ -166,10 +166,12 @@ export type BotDifficulty = 'EASY' | 'NORMAL' | 'HARD';
 export interface BotAutomation {
     players: {id: string; name: string; difficulty: BotDifficulty; policyVersion: string}[];
     canControl: boolean; paused: boolean; epoch: number;
+    pauseAfterPhase: boolean; pausedAfterPhase: string | null; pausedAfterPlayer: string | null;
 }
 export interface BotJob {
     seat: string; difficulty: BotDifficulty; seed: number; decisionId: string;
     submissionVersion: string | null; observation: unknown;
+    policyVersion?: string; initiative?: unknown; finish?: unknown;
 }
 export interface BotWork {
     revision: number; epoch: number; leaseUntil: number; paused: boolean;
@@ -243,7 +245,7 @@ export interface Snapshot {
         capability?: 'NONE' | 'SUFFIX_EDIT' | 'PREFIX_REWIND'; latestTarget?: RewindTarget | null; converted?: boolean};
 }
 export interface CreatedGame {gameId: string; name: string; registered?: boolean; links: {id: string; name: string; path: string}[]}
-export interface ApplicationConfig {authMode: 'local' | 'firebase'; firebase: Record<string, string> | null; pollIntervalMs: number}
+export interface ApplicationConfig {authMode: 'local' | 'firebase'; firebase: Record<string, string> | null; pollIntervalMs: number; automataVersion?: string}
 export interface Account {id: string; handle: string; mayCreateGames: boolean; admin: boolean}
 export interface Session {id: string; emailVerified: boolean; account: Account | null}
 export type GameStatus = 'ONGOING' | 'MY_MOVE' | 'FINISHED' | 'CANCELLED' | 'ABANDONED' | 'UNAVAILABLE';

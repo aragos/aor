@@ -54,24 +54,38 @@ export async function checkDecisionClarity(page, web, baseline) {
 }
 
 export async function checkLiveMarkerReduction(page, web) {
-    const game = await createGame(3);
-    for (const player of game.links) await game.send(player, 'bid-capital 0');
-    let state;
-    let actor;
-    for (let step = 0; step < 100; step++) {
-        state = await game.snapshot(game.links[0]);
-        actor = game.links.find(player => state.prompt?.players.includes(player.id));
-        assert(actor, `A real actor at ${state.game.stage}`);
-        state = await game.snapshot(actor);
-        if (state.game.stage === 'EXPANSION') break;
-        const command = state.game.stage === 'TOKEN_PURCHASE' ? 'buy-tokens 5'
-            : state.legalChoices.commands.find(command => command.startsWith('choose-capital '))
-                ?? state.legalChoices.commands.find(command => command.startsWith('choose-turn-position '))
-                ?? state.legalChoices.commands.find(command => command === 'pass')
-                ?? state.legalChoices.commands.find(command => command === 'stabilize cash');
-        assert(command, `A setup command at ${state.game.stage}`);
-        await game.send(actor, command);
+    const game = await createGame(3, {options: {map: 'european'}});
+    const actor = game.links[0];
+    for (const player of game.links) await game.send(player, player === actor ? 'bid-capital 2' : 'bid-capital 0');
+
+    async function reachExpansion(ready) {
+        for (let step = 0; step < 220; step++) {
+            const baseline = await game.snapshot(actor);
+            const player = game.links.find(candidate => baseline.prompt?.players.includes(candidate.id));
+            assert(player, `A live actor at ${baseline.game.stage}`);
+            const state = player === actor ? baseline : await game.snapshot(player);
+            const me = state.game.players.find(candidate => candidate.id === player.id);
+            const isExpansion = state.prompt.messageId === 'prompt.expand';
+            if (isExpansion && player === actor && ready(state)) return state;
+            // Expand through cheap land routes first, then use ships as the remaining markets require.
+            const market = isExpansion && player === actor && state.game.expansionOffers
+                .filter(offer => offer.primaryAction === 'PLACE' && offer.establishesMarker && !offer.blockers.length)
+                .sort((a, b) => (a.shipping?.required ?? 0) - (b.shipping?.required ?? 0) || a.requiredTokens - b.requiredTokens)[0];
+            const choices = state.legalChoices.commands;
+            const command = state.game.stage === 'TOKEN_PURCHASE' ? `buy-tokens ${player === actor ? Math.min(me.cash, 36) : 0}`
+                : market ? `place ${market.requiredTokens} ${market.destination}`
+                : player === actor && choices.includes('choose-capital venice') ? 'choose-capital venice'
+                : player === actor && choices.includes('upgrade-ships') && state.game.shippingOffer?.blockers.length === 0 ? 'upgrade-ships'
+                : choices.includes('stabilize cash') ? 'stabilize cash'
+                : choices.includes('pass') ? 'pass'
+                : choices[0];
+            assert(command, `An offered fixture command at ${state.game.stage}`);
+            await game.send(player, command);
+        }
+        assert.fail('Could not reach the requested marker supply');
     }
+
+    const state = await reachExpansion(() => true);
     const player = state.game.players.find(player => player.id === actor.id);
     assert(player.boardMarkers < 25, 'The live game still has unused domination markers');
     assert.deepEqual(state.game.markerReductionOffers, []);
@@ -89,5 +103,40 @@ export async function checkLiveMarkerReduction(page, web) {
     const after = await game.snapshot(actor);
     assert.equal(after.revision, state.revision, 'Rejection does not append history');
     assert.deepEqual(after.game.board, state.game.board, 'Rejection leaves all pieces in place');
-    console.log('Passed: live marker reduction is absent below 25 deployed markers; direct requests are rejected without changing board or history.');
+
+    const exhausted = await reachExpansion(snapshot => snapshot.game.markerReductionOffers.length > 0);
+    const offer = exhausted.game.markerReductionOffers[0];
+    assert.equal(exhausted.game.players.find(player => player.id === actor.id).stockMarkers, 0);
+    await page.wait(`document.querySelector('.marker-reduction-toggle')`, 'Live exhaustion notice and reduction action');
+    assert.match(await page.evaluate(`document.querySelector('.marker-reduction').textContent`), /All 25 domination markers are in play/);
+    assert.equal(await page.evaluate(`document.querySelector('#marker-reduction-province')`), null, 'Review starts collapsed');
+    for (const [width, height, mobile] of [[1440, 980, false], [390, 844, true]]) {
+        await page.send('Emulation.setDeviceMetricsOverride', {width, height, deviceScaleFactor: 1, mobile});
+        await page.click('Reduce a marker');
+        assert.equal(await page.evaluate(`document.activeElement.id`), 'marker-reduction-province');
+        await page.fill('#marker-reduction-province', offer.command);
+        await page.wait(`document.querySelector('.reduce-marker-action:not([disabled])')`, 'Chosen marker can be reviewed');
+        assert.equal((await game.snapshot(actor)).revision, exhausted.revision, 'Choosing a market is read-only');
+        assert.match(await page.evaluate(`document.querySelector('.reduction-preview').textContent`), /commodity control/);
+        assert((await page.evaluate(`document.querySelector('.reduction-preview').textContent`)).includes(`$${offer.incomeBefore} → $${offer.incomeAfter}`));
+        await page.wait(`(() => {
+            const panel = document.querySelector('.decision-scroll').getBoundingClientRect();
+            const preview = document.querySelector('.reduction-preview').getBoundingClientRect();
+            const confirm = document.querySelector('.reduce-marker-action').getBoundingClientRect();
+            return preview.top >= panel.top && preview.bottom <= panel.bottom + 1 && confirm.bottom <= innerHeight;
+        })()`, 'Reduction consequences and confirmation are both visible');
+        await page.viewportScreenshot(join(process.env.AOR_BROWSER_ARTIFACTS, mobile ? 'marker-reduction-phone.png' : 'marker-reduction.png'));
+        if (!mobile) {
+            await page.click('Cancel');
+            assert.equal(await page.evaluate(`document.activeElement.textContent`), 'Reduce a marker');
+        }
+    }
+    await page.evaluate(`document.querySelector('.reduce-marker-action').click()`);
+    await page.wait(`!document.querySelector('.marker-reduction') && !document.querySelector('.reduce-marker-action')`,
+        'Successful reduction clears the exhausted state and the review');
+    const reduced = await game.snapshot(actor);
+    assert.equal(reduced.revision, exhausted.revision + 1);
+    assert.equal(reduced.game.players.find(player => player.id === actor.id).stockMarkers, 1);
+    assert.equal(reduced.game.board.find(province => province.id === offer.province).marker, null);
+    console.log('Passed: live marker reduction is unavailable below 25 markers, then offers an explicit review and returns a marker on confirmation.');
 }

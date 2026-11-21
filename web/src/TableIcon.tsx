@@ -1,5 +1,5 @@
-/** Shared quantity symbols from the approved game-table design. */
-export function TableIcon({kind}: {kind: 'cash' | 'income' | 'misery' | 'ship' | 'cards' | 'token' | 'advances' | 'map' | 'commodities' | 'activity' | 'players'}) {
+/** Shared symbols for game-table controls and quantities. */
+export function TableIcon({kind}: {kind: 'cash' | 'income' | 'misery' | 'ship' | 'cards' | 'token' | 'advances' | 'map' | 'commodities' | 'activity' | 'players' | 'expand' | 'minimize'}) {
     return <svg className="table-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"
         strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
         {kind === 'cash' && <><circle cx="11" cy="11" r="7"/><path d="M10 7h3M9 10h4M9 13h4M11 7v7M17 7a7 7 0 0 1-1 13"/></>}
@@ -13,5 +13,7 @@ export function TableIcon({kind}: {kind: 'cash' | 'income' | 'misery' | 'ship' |
         {kind === 'commodities' && <><path d="m8 3 1.5 5h5L16 3l-4 1ZM9 8c-2 3-6 6-6 10 0 3 4 4 9 4s9-1 9-4c0-4-4-7-6-10ZM8 8h8"/><path d="M14.5 12h-3a1.5 1.5 0 0 0 0 3h1a1.5 1.5 0 0 1 0 3h-3M12 11v8"/></>}
         {kind === 'activity' && <><rect x="4" y="3" width="16" height="18" rx="2"/><path d="m7 8 1 1 2-2m-3 7 1 1 2-2M13 8h4M13 14h4M7 18h10"/></>}
         {kind === 'players' && <><circle cx="9" cy="7" r="4"/><path d="M2 21v-3a7 7 0 0 1 14 0v3M16 4a4 4 0 0 1 0 8M19 15a6 6 0 0 1 3 6"/></>}
+        {kind === 'expand' && <path d="M9 4H4v5m11-5h5v5m0 6v5h-5M4 15v5h5"/>}
+        {kind === 'minimize' && <path d="M4 9h5V4m6 0v5h5m0 6h-5v5m-6 0v-5H4"/>}
     </svg>;
 }

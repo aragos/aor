@@ -2,7 +2,9 @@ package dev.aragos.aor
 
 import com.fasterxml.jackson.databind.node.ObjectNode
 import com.google.common.truth.Truth.assertThat
+import dev.aragos.aor.ai.BOT_POLICY_VERSION
 import dev.aragos.aor.ai.BotDifficulty
+import dev.aragos.aor.ai.PREVIOUS_HARD_AUTOMATA_VERSION
 import java.nio.file.Files
 import java.util.UUID
 import java.util.concurrent.Callable
@@ -36,6 +38,44 @@ class BotAutomationTest(private val postgres: Boolean) {
                 .containsExactly(BotDifficulty.NORMAL, BotDifficulty.HARD)
                 .inOrder()
             assertThat(snapshot.automation?.canControl).isTrue()
+        }
+
+    @Test
+    fun storedNovember20HardSeatCanResumeAndSubmitItsSealedBid() =
+        AutomationFixture(postgres, version = PREVIOUS_HARD_AUTOMATA_VERSION).use { fixture ->
+            val service = fixture.reopened()
+            val gameId = fixture.game.gameId
+            val work =
+                BotAutomation.control(
+                    service,
+                    gameId,
+                    fixture.access(),
+                    "claim",
+                    fixture.runnerId,
+                    expectedEpoch = 0,
+                    now = 1000,
+                )
+            val job = work.observations.first()
+            BotAutomation.submit(
+                service,
+                gameId,
+                fixture.access(),
+                fixture.runnerId,
+                work.epoch,
+                work.revision,
+                job.submissionVersion,
+                job.seat,
+                job.decisionId,
+                "bid-capital 10",
+                UUID.randomUUID().toString(),
+                now = 1100,
+            )
+
+            val stored = fixture.reopened().store.read(gameId)
+            assertThat(job.policyVersion).isEqualTo(PREVIOUS_HARD_AUTOMATA_VERSION)
+            assertThat(stored.bots[job.seat]?.policyVersion)
+                .isEqualTo(PREVIOUS_HARD_AUTOMATA_VERSION)
+            assertThat(stored.pendingBids.keys).contains(job.seat)
         }
 
     @Test
@@ -338,7 +378,11 @@ class BotAutomationTest(private val postgres: Boolean) {
             fixture.humanCommand("pass")
             val fresh = fixture.read(work.epoch)
             val job = fresh.observations.first()
-            val command = job.observation.candidates.first().command
+            val command =
+                checkNotNull(job.observation) { "Legacy work requires an observation." }
+                    .candidates
+                    .first()
+                    .command
 
             val accepted = fixture.submit(fresh, job, command)
 
@@ -507,6 +551,220 @@ class BotAutomationTest(private val postgres: Boolean) {
         }
 
     @Test
+    fun creatorCanReviewBotBidsAfterAHumanClosesThePhase(): Unit =
+        AutomationFixture(postgres).use { fixture ->
+            val work = fixture.setPhasePause(enabled = true, expectedEpoch = fixture.claim().epoch)
+            val firstBid = fixture.submit(work, work.observations.single(), "bid-capital 2")
+            val secondBid =
+                fixture.submit(firstBid, firstBid.observations.single(), "bid-capital 3")
+            assertThat(secondBid.paused).isFalse()
+            assertThat(fixture.snapshot().events.map(HistoryEventView::kind))
+                .doesNotContain(HistoryEventKind.BID_CAPITAL)
+
+            val revealed = fixture.humanCommand("bid-capital 4")
+
+            val reopened = fixture.reopened().get(fixture.game.gameId, fixture.access())
+            assertThat(reopened.automation).isEqualTo(revealed.automation)
+            assertThat(revealed.automation?.pausedAfterPhase).isEqualTo(Stage.BIDDING)
+            assertThat(revealed.events.filter { it.kind == HistoryEventKind.BID_CAPITAL })
+                .hasSize(3)
+            assertThat(revealed.prompt?.players).containsExactly(PlayerId("p1"))
+        }
+
+    @Test
+    fun aHumanMoveResumesAReviewPauseWithoutClaimingTheLease() =
+        AutomationFixture(postgres, pauseAfterPhase = true).use { fixture ->
+            val paused = fixture.revealBidsAsHuman()
+            val command = paused.legalChoices.commands.first { it.startsWith("choose-capital ") }
+
+            val next = fixture.humanCommand(command)
+
+            assertThat(next.automation?.paused).isFalse()
+            assertThat(next.automation?.pausedAfterPhase).isNull()
+            assertThat(next.automation?.pauseAfterPhase).isTrue()
+            val runner = fixture.service.store.read(fixture.game.gameId).botRunner
+            assertThat(runner?.runnerId).isNull()
+        }
+
+    @Test
+    fun disablingReviewsResumesAnExistingReviewPause() =
+        AutomationFixture(postgres, pauseAfterPhase = true).use { fixture ->
+            val paused =
+                checkNotNull(fixture.revealBidsAsHuman().automation) {
+                    "The fixture needs a reviewed capital bid."
+                }
+
+            val resumed = fixture.setPhasePause(enabled = false, expectedEpoch = paused.epoch)
+
+            assertThat(resumed.paused).isFalse()
+            assertThat(fixture.snapshot().automation?.pausedAfterPhase).isNull()
+            assertThat(fixture.snapshot().automation?.pauseAfterPhase).isFalse()
+        }
+
+    @Test
+    fun eachAutomatedCardPlayerPausesBeforeTheNextPlayerActs() =
+        AutomationFixture(postgres).use { fixture ->
+            fixture.prepareFirstTurn()
+            val work = fixture.setPhasePause(enabled = true, expectedEpoch = fixture.claim().epoch)
+            val firstPlayer = work.observations.single().seat
+
+            val firstPause = fixture.finishBotCardPlay(work)
+
+            val first = fixture.snapshot()
+            assertThat(firstPause.paused).isTrue()
+            assertThat(first.game.stage).isEqualTo(Stage.PLAY_CARDS)
+            assertThat(first.automation?.pausedAfterPlayer).isEqualTo(firstPlayer)
+            assertThat(
+                    first.events.filter { it.kind == HistoryEventKind.PLAY_CARD }.map { it.actor }
+                )
+                .containsExactly(firstPlayer)
+
+            val resumed = fixture.control("resume", firstPause.epoch)
+            val secondPlayer = resumed.observations.single().seat
+            fixture.finishBotCardPlay(resumed)
+
+            val second = fixture.snapshot()
+            assertThat(second.automation?.pausedAfterPhase).isEqualTo(Stage.PLAY_CARDS)
+            assertThat(second.automation?.pausedAfterPlayer).isEqualTo(secondPlayer)
+            assertThat(second.game.stage).isEqualTo(Stage.PLAY_CARDS)
+            assertThat(
+                    second.events.filter { it.kind == HistoryEventKind.PLAY_CARD }.map { it.actor }
+                )
+                .containsExactly(firstPlayer, secondPlayer)
+                .inOrder()
+        }
+
+    @Test
+    fun lastAutomatedExpanderPausesBeforeTheBonusDrawAndResumesAfterReload() =
+        AutomationFixture(postgres).use { fixture ->
+            fixture.prepareLastBotExpansion()
+            val work = fixture.setPhasePause(enabled = true, expectedEpoch = fixture.claim().epoch)
+            val job = work.observations.single()
+            val view =
+                fixture.service.store.read(fixture.game.gameId).state().viewForPlayer(job.seat)
+            val marker =
+                view.expansionOffers.first { offer ->
+                    offer.primaryAction == ExpansionAction.PLACE &&
+                        offer.establishesMarker &&
+                        offer.blockers.isEmpty()
+                }
+            val placed =
+                fixture.submit(work, job, "place ${marker.requiredTokens} ${marker.destination}")
+
+            val ended = fixture.submit(placed, placed.observations.single(), "pass")
+
+            val reopened = fixture.reopened()
+            val held = reopened.get(fixture.game.gameId, fixture.access())
+            assertThat(ended.paused).isTrue()
+            assertThat(held.automation?.pausedAfterPhase).isEqualTo(Stage.EXPANSION)
+            assertThat(held.events.none { it.drawReason == CardDrawReason.EXPANSION_BONUS })
+                .isTrue()
+            assertThat(reopened.store.read(fixture.game.gameId).phaseOutcomesDeferred).isTrue()
+
+            BotAutomation.control(
+                reopened,
+                fixture.game.gameId,
+                fixture.access(),
+                "resume",
+                fixture.runnerId,
+                expectedEpoch = ended.epoch,
+                now = 1200,
+            )
+
+            val resumed = reopened.get(fixture.game.gameId, fixture.access())
+            assertThat(
+                    resumed.events
+                        .filter { it.drawReason == CardDrawReason.EXPANSION_BONUS }
+                        .map(HistoryEventView::actor)
+                )
+                .containsExactly(job.seat)
+            assertThat(resumed.automation?.paused).isFalse()
+            assertThat(reopened.store.read(fixture.game.gameId).phaseOutcomesDeferred).isFalse()
+        }
+
+    @Test
+    fun revealedTokenPurchasesPauseBeforeTheNextPhasesAutomaticDraws() =
+        AutomationFixture(postgres).use { fixture ->
+            fixture.prepareTokenPurchase()
+            val work = fixture.setPhasePause(enabled = true, expectedEpoch = fixture.claim().epoch)
+            val first = fixture.submit(work, work.observations.single(), "buy-tokens 2")
+            fixture.submit(first, first.observations.single(), "buy-tokens 3")
+
+            val held = fixture.humanCommand("buy-tokens 1")
+
+            assertThat(held.automation?.pausedAfterPhase).isEqualTo(Stage.TOKEN_PURCHASE)
+            assertThat(held.events.any { it.kind == HistoryEventKind.TOKEN_PURCHASES }).isTrue()
+            assertThat(held.events.none { it.drawReason == CardDrawReason.TURN_DRAW }).isTrue()
+            assertThat(fixture.service.store.read(fixture.game.gameId).phaseOutcomesDeferred)
+                .isTrue()
+        }
+
+    @Test
+    fun resumeClearsThePhaseReasonAndKeepsTheSetting() =
+        AutomationFixture(postgres).use { fixture ->
+            val work = fixture.setPhasePause(enabled = true, expectedEpoch = fixture.claim().epoch)
+            fixture.humanCommand("bid-capital 1")
+            val firstBid = fixture.submit(work, work.observations.single(), "bid-capital 2")
+            val operationId = UUID.randomUUID().toString()
+            val revealed =
+                fixture.submit(
+                    firstBid,
+                    firstBid.observations.single(),
+                    "bid-capital 3",
+                    operationId,
+                )
+            val reconciled = fixture.read(firstBid.epoch)
+            assertThat(reconciled.paused).isTrue()
+            assertThat(reconciled.observations).isEmpty()
+            assertThat(reconciled.operationReceipts).contains(operationId)
+
+            val resumed = fixture.control("resume", revealed.epoch)
+
+            assertThat(resumed.paused).isFalse()
+            assertThat(resumed.observations.single().seat).isEqualTo(PlayerId("p3"))
+            assertThat(fixture.snapshot().automation?.pausedAfterPhase).isNull()
+            assertThat(fixture.snapshot().automation?.pauseAfterPhase).isTrue()
+        }
+
+    @Test
+    fun urbanAscendancyPurchaseAloneDoesNotPauseBots() =
+        AutomationFixture(postgres).use { fixture ->
+            val ready = fixture.prepareBotUrbanAscendancy()
+            val work = fixture.setPhasePause(enabled = true, expectedEpoch = fixture.claim().epoch)
+            val after = fixture.submit(work, work.observations.single(), "buy-card")
+
+            assertThat(after.paused).isFalse()
+            val snapshot = fixture.snapshot()
+            assertThat(snapshot.game.stage).isNotEqualTo(Stage.BUY_CARD)
+            assertThat(snapshot.events.last { it.kind == HistoryEventKind.BUY_CARD }.actor)
+                .isEqualTo(ready)
+        }
+
+    @Test
+    fun legacyBotRunnerDocumentsDefaultToContinuousPlay() =
+        AutomationFixture(postgres).use { fixture ->
+            val work = fixture.claim()
+            val pending = fixture.submit(work, work.observations.single(), "bid-capital 2")
+            val root = json.readTree(fixture.document()) as ObjectNode
+            (root["botRunner"] as ObjectNode).remove(listOf("pauseAfterPhase", "pausedAfterPhase"))
+            val restored = GameDocuments.read(fixture.game.gameId, root)
+
+            val next =
+                fixture.service.driver.submit(
+                    restored,
+                    pending.observations.single().seat,
+                    "bid-capital 3",
+                )
+            val revealed = fixture.service.driver.submit(next, PlayerId("p1"), "bid-capital 4")
+
+            assertThat(restored.pendingBids).containsExactly(PlayerId("p2"), 2)
+            assertThat(revealed.state().stage).isEqualTo(Stage.CAPITAL_CHOICE)
+            assertThat(revealed.botRunner?.paused).isFalse()
+            assertThat(revealed.botRunner?.pauseAfterPhase).isFalse()
+            assertThat(revealed.botRunner?.pausedAfterPhase).isNull()
+        }
+
+    @Test
     fun oldHumanOnlyDocumentsLoadReplayAndContinueWithoutBotFields() =
         AutomationFixture(postgres, humans = 3, bots = 0).use { fixture ->
             val root = json.readTree(fixture.document()) as ObjectNode
@@ -527,22 +785,42 @@ private class AutomationFixture(
     postgres: Boolean,
     humans: Int = 1,
     bots: Int = 2,
+    pauseAfterPhase: Boolean = false,
     policy: UndoPolicy = UndoPolicy.LINEAR_GAME,
+    version: String = BOT_POLICY_VERSION,
 ) : AutoCloseable {
     private val directory = Files.createTempDirectory("aor-bot-test-")
     private val database = if (postgres) PostgresFixture() else null
-    val service = database?.service() ?: createGameService(directory, FixedRandom())
+    private val storage = database?.store ?: FileGameStore(directory)
+    private val legacyCreation =
+        object : ManagedGameStore by storage {
+            override fun create(game: StoredGame) {
+                val legacy =
+                    game.bots.entries
+                        .mapIndexed { index, (seat, bot) ->
+                            seat to
+                                bot.copy(
+                                    difficulty =
+                                        if (index == 0 && version == BOT_POLICY_VERSION)
+                                            BotDifficulty.NORMAL
+                                        else BotDifficulty.HARD,
+                                    policyVersion = version,
+                                )
+                        }
+                        .toMap()
+                storage.create(game.copy(bots = legacy))
+            }
+        }
+    val service = GameService(legacyCreation, GameDriver(FixedRandom()))
     val game =
         service.create(
             names = List(humans) { "Human ${it + 1}" },
             bots =
                 List(bots) { index ->
-                    AutomatedPlayerRequest(
-                        "Automated ${index + 1}",
-                        if (index == 0) BotDifficulty.NORMAL else BotDifficulty.HARD,
-                    )
+                    AutomatedPlayerRequest("Automated ${index + 1}")
                 },
             undoPolicy = policy,
+            pauseAfterPhase = pauseAfterPhase,
         )
     val runnerId: String = UUID.randomUUID().toString()
 
@@ -563,6 +841,18 @@ private class AutomationFixture(
         now: Long = 1000,
     ): BotWork =
         BotAutomation.control(service, game.gameId, access(), operation, runner, expectedEpoch, now)
+
+    fun setPhasePause(enabled: Boolean, expectedEpoch: Int): BotWork =
+        BotAutomation.control(
+            service,
+            game.gameId,
+            access(),
+            "set-phase-pause",
+            runnerId,
+            expectedEpoch,
+            now = 1000,
+            pauseAfterPhase = enabled,
+        )
 
     fun submit(
         work: BotWork,
@@ -585,6 +875,13 @@ private class AutomationFixture(
             operationId,
             now,
         )
+
+    fun revealBidsAsHuman(): GameSnapshot {
+        val work = claim()
+        val firstBid = submit(work, work.observations.single(), "bid-capital 2")
+        submit(firstBid, firstBid.observations.single(), "bid-capital 3")
+        return humanCommand("bid-capital 4")
+    }
 
     fun humanCommand(command: String): GameSnapshot {
         val current = snapshot()
@@ -636,25 +933,107 @@ private class AutomationFixture(
         }
     }
 
-    fun prepareFirstTurn() {
+    fun prepareTokenPurchase() {
         service.store.update(game.gameId) { initial ->
             val bids =
                 initial.header.players.withIndex().fold(initial) { current, (index, player) ->
                     service.driver.submit(current, player.id, Command.BidCapital(3 - index))
                 }
-            val capitals =
-                initial.header.players.fold(bids) { current, _ ->
-                    val prompt = current.state().prompts().single() as Prompt.SinglePlayer
-                    service.driver.submit(
-                        current,
-                        prompt.player,
-                        current.state().legalChoices(prompt.player).commands.first(),
-                    )
-                }
-            initial.header.players.withIndex().fold(capitals) { current, (index, player) ->
-                service.driver.submit(current, player.id, Command.BuyTokens(3 - index))
+            initial.header.players.fold(bids) { current, _ ->
+                val prompt = current.state().prompts().single() as Prompt.SinglePlayer
+                service.driver.submit(
+                    current,
+                    prompt.player,
+                    current.state().legalChoices(prompt.player).commands.first(),
+                )
             }
         }
+    }
+
+    fun prepareFirstTurn(tokens: List<Int> = listOf(3, 2, 1)) {
+        prepareTokenPurchase()
+        service.store.update(game.gameId) { initial ->
+            initial.header.players.zip(tokens).fold(initial) { current, (player, amount) ->
+                service.driver.submit(current, player.id, Command.BuyTokens(amount))
+            }
+        }
+    }
+
+    fun prepareLastBotExpansion() {
+        prepareFirstTurn(tokens = listOf(5, 12, 3))
+        service.store.update(game.gameId) { initial ->
+            var current = initial
+            repeat(100) {
+                val state = current.state()
+                val prompt = state.prompts().single() as Prompt.SinglePlayer
+                if (state.stage == Stage.EXPANSION && prompt.player == PlayerId("p2")) {
+                    return@update current
+                }
+                val choices = state.legalChoices(prompt.player).commands
+                val command =
+                    when {
+                        "stabilize cash" in choices -> "stabilize cash"
+                        "stabilize misery" in choices -> "stabilize misery"
+                        "pass" in choices -> "pass"
+                        else -> choices.first()
+                    }
+                current = service.driver.submit(current, prompt.player, command)
+            }
+            error("The fixture must reach the last automated expansion activity.")
+        }
+    }
+
+    fun finishBotCardPlay(work: BotWork): BotWork {
+        val job = work.observations.single()
+        val state = service.store.read(game.gameId).state()
+        val command =
+            state.legalChoices(job.seat).commands.first { choice ->
+                if (!choice.startsWith("play ")) false
+                else {
+                    val after = state.step(TextCodec.parseAction(choice, state, actor = job.seat))
+                    after.flow.actor != job.seat || "pass" in after.legalChoices(job.seat).commands
+                }
+            }
+        val played = submit(work, job, command)
+        return if (played.paused) played else submit(played, played.observations.single(), "pass")
+    }
+
+    fun prepareBotUrbanAscendancy(): PlayerId {
+        prepareFirstTurn()
+        val bot = PlayerId("p2")
+        val ready =
+            service.store.update(game.gameId) { initial ->
+                var current = initial
+                repeat(100) {
+                    val state = current.state()
+                    when (val prompt = state.prompts().single()) {
+                        is Prompt.MultiPlayer -> {
+                            current =
+                                prompt.players.fold(current) { game, player ->
+                                    service.driver.submit(game, player, "buy-tokens 0")
+                                }
+                        }
+                        is Prompt.SinglePlayer -> {
+                            val actor = prompt.player
+                            val choices = state.legalChoices(actor).commands
+                            if (actor == bot && "buy-card" in choices) return@update current
+                            val command =
+                                when {
+                                    actor == bot && "buy-advance V" in choices -> "buy-advance V"
+                                    "stabilize cash" in choices -> "stabilize cash"
+                                    "stabilize misery" in choices -> "stabilize misery"
+                                    "pass" in choices -> "pass"
+                                    else -> choices.first()
+                                }
+                            current = service.driver.submit(current, actor, command)
+                        }
+                        is Prompt.System ->
+                            error("The authority must resolve outcomes before publishing a game.")
+                    }
+                }
+                error("The fixture must reach the automated Urban Ascendancy purchase.")
+            }
+        return (ready.state().prompts().single() as Prompt.SinglePlayer).player
     }
 
     fun reopened(): GameService =

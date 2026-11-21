@@ -49,7 +49,7 @@ class OpeningSelectionTest {
         assertThat(returned.playerState(p1).hand).hasSize(2)
         assertThat(returned.deckHistory.discarded).isEmpty()
         assertThat(returned.deckHistory.removed).isEmpty()
-        assertThat(returned.playedCards).isEmpty()
+        assertThat(returned.publiclyDiscardedCards).isEmpty()
         val failure =
             assertFailsWith<RuleViolation> {
                 returned.step(Entry.Shuffle(request.cards.drop(1)))
@@ -133,6 +133,24 @@ class OpeningSelectionTest {
         assertThat(turnTwoDraws).isEqualTo(3)
         assertThat(replay(completed.state.header, completed.lines)).isEqualTo(completed.state)
         assertThat(completed.state.stage).isEqualTo(Stage.FINISHED)
+    }
+
+    @Test
+    fun priorBidsRebuildFromRecordedCommandsWithoutRevealingCurrentSealedBids() {
+        val completed = opening().complete()
+        val states =
+            completed.lines.runningFold(GameState(completed.state.header)) { state, line ->
+                state.step(TextCodec.parse(line))
+            }
+        val opening = states.first { it.turnNumber == 2 && it.stage == Stage.TOKEN_PURCHASE }
+        val seat = opening.playerIds.first()
+        val current = opening.step(TextCodec.parse("$seat: buy-tokens 0"))
+
+        assertThat(current.viewForDecision(opening.playerIds[1]).pastTokenPurchases)
+            .containsExactly(opening.viewForDecision(seat).pastTokenPurchases.single())
+        assertThat(current.viewForDecision(opening.playerIds[1]).revealedTokenPurchases).isEmpty()
+        assertThat(opening.viewForDecision(seat).pastTokenPurchases.single().keys)
+            .containsExactlyElementsIn(opening.playerIds)
     }
 
     private fun firstTurn(): Scenario =

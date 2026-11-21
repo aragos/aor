@@ -35,6 +35,8 @@ class VariantFlowTest {
         val discarded = initial.play("p1: buy-advance P", "p1: discard-card burden")
 
         assertThat(discarded.playerState(p1).hand).isEmpty()
+        assertThat(discarded.publicView().unplayedCards.map(CardDefinition::id))
+            .doesNotContain("armor")
         assertThat(discarded.flow.decisions).isEmpty()
         assertThat(discarded.flow.actor).isEqualTo(p1)
         assertThat(discarded.flow.purchaseStep).isEqualTo(PurchaseStep.ADVANCES)

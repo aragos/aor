@@ -39,7 +39,7 @@ export async function checkCardAndPlayerDetails(page, web, baseline) {
     assert.match(await page.evaluate(`document.querySelector('[data-player="${viewer}"] .player-money').textContent`), /\$75/);
     for (const topic of ['misery-track', 'shipping-track']) {
         const help = `[data-player="${viewer}"] .player-stats button[data-help-topic="${topic}"]`;
-        assert.equal(await page.evaluate(`document.querySelector('${help}').textContent`), '?');
+        assert.equal(await page.evaluate(`!!document.querySelector('${help} svg') && !document.querySelector('${help}').textContent.includes('?')`), true);
         assert.equal(await page.evaluate(`document.querySelector('${help}').getAttribute('aria-haspopup')`), 'dialog');
     }
     assert.equal(await page.evaluate(`document.querySelectorAll('.player-detail .reference-link').length`), 0, 'Standalone reference-track links are removed');

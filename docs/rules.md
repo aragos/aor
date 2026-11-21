@@ -234,7 +234,8 @@ Recorded cash at the end of each turn is public.
 ### 5.3 Buy Card
 
 - **Urban Ascendancy.** In turn order, each owner may buy one extra card for $10.
-- **Master Art.** Each owner may then discard one card from hand with no effect, whether or not they bought one.
+- **Master Art.** Each owner may then publicly discard one card from hand with no effect, whether or not
+  they bought one.
 
 ### 5.4 Play Cards
 
@@ -381,11 +382,11 @@ stacking limits below.
 
 **Caravan** owners may place up to two land provinces away from a base.
 
-- The province in between must not be **controlled** by another player. White pieces and partial token sets do not
-  block.
+- White pieces do not block transit. An opponent's dark domination marker blocks transit, as
+  does a province filled entirely by dark tokens that include an opponent's token. A dark
+  opposing token fills its satellite.
 - Placing tokens in the intermediate province is optional.
-- If the intermediate province is full (at its market number), the player must win a competition there before
-  passing through. The official May 1998 errata confirms this requirement.
+- Win any competition needed to clear a blocked intermediate province before passing through.
 - A player may attack a second province *through* a province it has just won.
 - Caravan cannot be combined with shipping in one placement.
 
@@ -977,8 +978,8 @@ These rulings supplement the baseline; they are resolved decisions, not selectab
   tokens; reject excess commitments (2026-10-23).
 - **Expansion bonus:** event-rebuilt and voluntarily rebuilt markers are excluded. Earlier selectable
   rebuilt-marker, improved-setup and alternate-edition rules are retired; §13 owns current options.
-- **Caravan:** official May 1998 errata requires successful competition in a fully occupied
-  intermediate province before passing through it.
+- **Caravan:** the table uses dark-side occupancy for transit as specified in §6.3. The older
+  full-occupancy rule, based on the May 1998 errata, is retained for historical turns.
 
 **Map transcription:** catalog definitions live in `BoardProvinces.kt`, `BoardConnections.kt` and
 `EuropeanMapData.kt`; [map tooling](map-design.md) exports and validates the resolved graph.

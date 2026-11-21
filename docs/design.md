@@ -42,8 +42,10 @@ Static shipping adjacency is keyed by exact map/count; advances, ownership and c
 Hosted Firebase UIDs map to game-local seat IDs through memberships; creator/admin roles are explicit.
 Current handles may change, but recorded names/capital symbols retain entry-time identity. Admins do
 not impersonate seats. Spectators receive public projections without hands, choices or edit access.
-Apply audiences to outcomes, diagnostics, plans and historical reads too. Only administrative exports
-include complete hidden outcomes; public ETags exclude other players' private writes.
+Master Art discards reveal the card identity to all players and spectators, including when replaying
+existing histories; automatic hand losses remain private. Apply audiences to outcomes, diagnostics,
+plans and historical reads too. Only administrative exports include complete hidden outcomes; public
+ETags exclude other players' private writes.
 
 Simultaneous bids/purchases persist outside the log until all seats submit; validate and append the
 whole batch atomically in stable player order. Pending values have no game effect and may be replaced
@@ -61,14 +63,17 @@ retaining amounts. [Commands](commands.md) owns API fields and diagnostics.
 | Competitive | Committed actions are final. |
 | Regular turn (default) | Own open phase activity, until another player acts or an outcome is recorded. |
 | Friendly turn | Active player's phase activity including nested responses; preserve random events/outcomes. |
-| Linear game | Creator: any complete post-setup prefix, even after completion. Others: their open phase activity. |
+| Friendly game | Creator: any complete post-setup prefix, even after completion. Others: their open phase activity. |
 
 An activity covers one phase, including interruptions under the outer owner. Setup through capital
 selection is protected. Suffix edits can retain others' actions with `@entry`, never invent their
 answers. Validate the entire suffix and original logical random requests/outcomes; reject added,
 removed, ambiguous or incompatible requests atomically. Historical reads retain the viewer's audience.
 
-### Linear game
+### Friendly game
+
+The current policy uses the identifier `linear-game`. The older `friendly-game` identifier
+retains its legacy meaning for historical replay.
 
 Rewind retains an exact shorter prefix with no redo/suffix replacement. A unit includes the action,
 required outcomes and automatic transitions; simultaneous reveal is indivisible. Targets derive
@@ -84,7 +89,7 @@ disarm plans/rotate versions (only the undoing player’s plans when turn and ph
 expire out-of-scope work and invalidate previews. In-scope saved actions may remain unarmed drafts; execution receipts remain facts. Workers must not recreate undone play;
 stale/uncertain requests reconcile before new explicit confirmation.
 
-`LinearGameMigration.kt` converts legacy Friendly game policies with an archived, audited zero-entry
+`LinearGameMigration.kt` converts the legacy `friendly-game` policy with an archived, audited zero-entry
 revision, preserving chain, identities, outcomes, prompts, secrets, receipts and valid plan authority.
 Validate old edits under their revision-time policy. Conversion alone does not clear/disarm work.
 Migration is atomic, resumable and idempotent for restored/imported games too. All readers must support
@@ -112,24 +117,44 @@ Failed writes consume no progress.
 
 ## Automated seats
 
-New bots are local private-link seats only; hosted creation requires 3–6 registered humans. Existing
-saves retain controllers/endpoints. `BotAutomation.kt` owns metadata and creator-only 30-second fenced
-leases. Human seats alone have memberships/credentials; absent automation metadata means human-only.
-Archives/checkpoints preserve controllers and pending decisions.
+New local and hosted games can include Hard automated seats in their 3–6 seats. Only humans
+receive memberships or private links. Archives and checkpoints preserve controllers and pending
+decisions. Each new seat records its versioned policy in the game document.
 
-The [browser runner](../web/src/ai/botRunner.ts) sends one seat-safe observation at a time to one local
-worker. [Policies](engine.md#opponent-policies) return canonical commands; the server validates,
-persists and supplies actual randomness. Reads never execute bots; search never calls the server.
-Writes atomically check lease epoch, revision, decision and private-submission version; UUID/hash
-receipts prevent duplicate uncertain decisions. Sealed amounts stay private until ordinary reveal.
-Public snapshots exclude runner identity, deadlines, seeds, hands and receipts.
+The [browser runner](../web/src/ai/botRunner.ts) runs decisions in a worker while the creator
+has the game open. The server supplies one automated seat's own observation, public information
+and authoritative quotes. The worker loads the recorded policy and chooses a canonical command.
+The server validates and records it, supplies actual randomness, and never runs model inference.
+Writes atomically check lease epoch, revision, decision and private-submission version. UUID/hash
+receipts reconcile retries. Sealed amounts stay private from the other humans until ordinary reveal.
+The creator can inspect the automated seats' inputs and alter their commands.
 
-Only the creator hosts/pauses/resumes/takes over. Regular-turn undo/edits retain the runner and explicit
-pause; stale work rejects and refreshes automatically. Other edits/rewinds pause bots and rotate epochs
-until explicit resume. Completion/closure stops bots. Creator abandonment records separate bot consent;
-each human still consents. The host can inspect bot secrets/modify policy; worker isolation protects
-rendering, not secrets. Replay needs neither policy nor model. [Training](contributing.md#opponent-training)
-is independent of production storage and promotes only compatible, evaluated models.
+Only the creator claims, pauses, resumes or takes over the 30-second lease. Regular-turn undo and
+edits retain the runner and its pause state. Other edits and rewinds pause bots and rotate the
+epoch until explicit resume. Completion and closure stop bots. Creator abandonment records
+separate bot consent. Each human still consents.
+
+The creator can opt into phase pauses during setup or in Game options. The server pauses the
+runner when an automated seat finishes its own phase activity containing a decision in public
+Activity. A shared sealed batch counts once, on reveal. Urban Ascendancy card purchases, passes
+omitted from Activity, and automatic outcomes do not trigger a pause. Resume is in Activity.
+A successful human game command or turning the setting off also releases a review pause. Manual
+and history-edit pauses require explicit resume. The setting and pause survive reload. Older saves
+can omit the reviewed seat, and games without this setting default to continuous play. When a qualifying
+activity hands off to pending authority outcomes in the next turn phase, its revision commits the
+action and holds those outcomes. Resume appends the outcomes in a new authority revision. This
+keeps expansion bonus draws and analogous next-phase draws or rolls out of Activity until resume.
+
+[The worker](../web/src/ai/botWorker.ts) selects one hashed, immutable checkpoint model by
+policy version and player count. The November 21 Hard policy uses the same assets as November 20.
+Its controller prices expected market income and adjusts initiative by table size and opening.
+Existing Hard seats keep their recorded controller on reload and continue receiving initiative and
+finish quotes. The three published assets total 304 KiB, with 90–123 KiB
+uncompressed downloaded once per applicable worker (HTTP caching reuses the versioned URL).
+Startup, setup, human-only games and read-only visits do not initialize the worker or fetch the
+models. Replays use recorded commands and outcomes. Keep older policy files available while
+saved games reference them. [Training](contributing.md#opponent-training) runs independently of
+production storage.
 
 ## Lifecycle and activity
 

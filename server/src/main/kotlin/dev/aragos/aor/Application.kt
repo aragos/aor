@@ -155,8 +155,19 @@ fun Application.module(
         post("/api/games") {
             call.api {
                 val body = call.body()
-                body.fieldsOnly("players", "bots", "options", "undoPolicy", "name")
+                body.fieldsOnly(
+                    "players",
+                    "bots",
+                    "options",
+                    "undoPolicy",
+                    "name",
+                    "pauseAfterPhase",
+                )
                 val bots = body.automatedPlayers()
+                val pauseAfterPhase = body["pauseAfterPhase"]?.boolean() ?: false
+                if (pauseAfterPhase && bots.isEmpty()) {
+                    throw ServiceFailure(400, "INVALID_GAME")
+                }
                 val name =
                     try {
                         body["name"]?.let { GameName.parse(it.string()) } ?: GameName.DEFAULT
@@ -184,7 +195,14 @@ fun Application.module(
                     withContext(Dispatchers.IO) {
                         val players = body.field("players").array().map(JsonNode::string)
                         if (hosted == null) {
-                            gameService.create(players, rules, undoPolicy, name, bots)
+                            gameService.create(
+                                players,
+                                rules,
+                                undoPolicy,
+                                name,
+                                bots,
+                                pauseAfterPhase,
+                            )
                         } else {
                             hosted.create(
                                 hosted.identity(call.token()),
@@ -193,6 +211,7 @@ fun Application.module(
                                 undoPolicy,
                                 name,
                                 bots,
+                                pauseAfterPhase,
                             )
                         }
                     }

@@ -105,7 +105,11 @@ export async function checkReferenceUx(page, web, baseline) {
         }
     }
     await page.evaluate(`document.querySelector('.reference-dialog .close-detail').click()`);
-    await page.evaluate(`document.querySelector('#tab-players')?.click(); document.querySelector('.player-summary.is-viewer .income-value .help-link').click()`);
+    await page.evaluate(`document.querySelector('#tab-players')?.click()`);
+    await page.wait(`document.querySelector('.player-summary.is-viewer').checkVisibility()`, 'Player summary available');
+    assert.equal(await page.evaluate(`[...document.querySelectorAll('.player-summary .reference-link')]
+        .every(link => getComputedStyle(link).textDecorationLine === 'none')`), true, 'Player references have no underline');
+    await page.evaluate(`document.querySelector('.player-summary.is-viewer [data-help-topic="income-track"]').click()`);
     await page.wait(`document.querySelector('#income-track .payout-box')`, 'Income symbol opens its own track');
     assert.equal(await page.evaluate(`document.querySelectorAll('#income-track .payout-box').length`), 26, 'Every marker count from 0 to 25 has a base income');
     assert.deepEqual(await page.evaluate(`[...document.querySelectorAll('#income-track .payout-box strong')].map(box => box.textContent)`), baseline.game.catalog.incomeTrack.map(amount => '$' + amount), 'Income reference uses the active game’s starting player count');

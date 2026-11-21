@@ -10,7 +10,7 @@ export async function checkSpectator(page, web, baseline) {
     await page.wait(`typeof window.setMapSnapshot === 'function'`, 'spectator table harness');
     const publicSnapshot = {...baseline, revision: 41000, viewerId: null, accountId: null,
         pendingBid: null, submitted: [], submissionReceipts: [], submissionVersion: null, history: [],
-        events: baseline.events.map(event => ['DRAW_CARD', 'DISCARD_CARD', 'TRADE_CARD'].includes(event.kind)
+        events: baseline.events.map(event => ['DRAW_CARD', 'TRADE_CARD'].includes(event.kind)
             ? {...event, card: null} : event),
         legalChoices: {commands: [], bidMin: null, bidMax: null},
         undo: {...baseline.undo, available: false, fromEntry: null, actions: []},
@@ -29,7 +29,7 @@ export async function checkSpectator(page, web, baseline) {
     assert.equal(await page.evaluate(`document.querySelectorAll('.player-summary').length`), baseline.game.players.length,
         'All public player summaries remain visible');
     if (baseline.game.turnOrder.length) {
-        await page.evaluate(`document.querySelector('.player-turn-order .help-link').click()`);
+        await page.evaluate(`document.querySelector('.player-turn-order [data-help-topic="turn-order"]').click()`);
         await page.wait(`document.querySelector('#turn-order .order-track')`, 'spectator turn-order reference');
         assert.equal(await page.evaluate(`document.querySelectorAll('#turn-order .order-track-player').length`), baseline.game.players.length);
         assert.equal(await page.evaluate(`document.querySelectorAll('#turn-order .is-viewer').length`), 0,

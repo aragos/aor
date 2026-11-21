@@ -113,7 +113,7 @@ sealed interface TurnCommand : Command {
             val next = if (immediate == null) state else state.popDecision()
             val discarded =
                 next
-                    .discardCards(listOf(selected))
+                    .discardCards(listOf(selected), publicly = true)
                     .replacePlayer(player.copy(hand = player.hand - selected))
             return if (immediate != null) discarded
             else

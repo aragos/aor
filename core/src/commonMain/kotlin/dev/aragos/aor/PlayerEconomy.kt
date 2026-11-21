@@ -49,6 +49,9 @@ data class IncomeQuote(
  * the authoritative game.
  */
 object PlayerEconomy {
+    /** Immediate ordinary-income dollars from Middle Class ownership, including this turn. */
+    fun middleClassIncomeBonus(owned: Boolean): Int = if (owned) 10 else 0
+
     /** Cost of every card still held, including burdens, before choosing cash or misery payment. */
     fun stabilizationCost(player: PlayerState): Long =
         stabilizationCost(
@@ -159,7 +162,7 @@ object PlayerEconomy {
         player.requireActive()
         require(boardMarkerCount in 0..25) { "Income requires zero through 25 dominated markets." }
         val baseIncome = EconomyTables.incomeFor(initialPlayerCount)[boardMarkerCount]
-        val middleClass = if (player.advances.owns(AdvanceId.MIDDLE_CLASS)) 10 else 0
+        val middleClass = middleClassIncomeBonus(player.advances.owns(AdvanceId.MIDDLE_CLASS))
         val income = baseIncome + middleClass
         return IncomeQuote(
             baseIncome = baseIncome,

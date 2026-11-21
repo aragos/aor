@@ -181,11 +181,11 @@ try {
         const expectedRevision = state.revision + (pending ? 0 : 1);
         await perform(state, command);
         const privateBid = /^(bid-capital|buy-tokens) /.test(command);
-        const savedStatus = privateBid
-            ? `document.querySelector('.private-draft-status')?.textContent === ${JSON.stringify('Saved privately: ' + command.split(' ')[1])}`
-            : `document.querySelector('.save-status')?.textContent === 'Saved'`;
+        const privateAmount = privateBid
+            ? ` && document.querySelector('.private-draft-status')?.textContent === ${JSON.stringify('Your private submission: ' + command.split(' ')[1])}`
+            : '';
         const accepted = pending
-            ? `document.querySelector('.player-summary.is-viewer .player-status')?.textContent === 'Submitted' && (${savedStatus})`
+            ? `document.querySelector('.player-summary.is-viewer .player-status')?.textContent === 'Submitted'${privateAmount}`
             : `document.querySelector('#tool-tab-commands small')?.textContent.trim() === ${JSON.stringify('Revision ' + expectedRevision)}`;
         await page.wait(`(${accepted}) || document.querySelector('.decision-panel .error')`, `accepted visual action ${command}`);
         const error = await page.evaluate('document.querySelector(".decision-panel .error")?.textContent ?? null');

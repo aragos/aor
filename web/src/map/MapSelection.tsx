@@ -3,7 +3,7 @@ import type {Dispatch, ReactNode, SetStateAction} from 'react';
 
 interface Picker {
     id: string;
-    kind?: 'province' | 'area';
+    kind?: 'province' | 'area' | 'capital';
     title: string;
     eligible: string[];
     selected: string[];
@@ -83,7 +83,7 @@ export function MapPicker({title, eligible, selected, onPick, disabled = false, 
     selected: string[];
     onPick: (province: string) => void;
     disabled?: boolean;
-    kind?: 'province' | 'area';
+    kind?: Picker['kind'];
 }) {
     const id = useId();
     const {picker, setPicker, setWorkspace, focusRevision} = useMapSelection();

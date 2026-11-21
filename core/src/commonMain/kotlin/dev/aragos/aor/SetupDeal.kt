@@ -8,11 +8,8 @@ internal object SetupDeal {
      * Validate supply before setup; sequential returns leave one candidate beyond all kept hands.
      */
     fun validate(state: GameState) {
-        if (!state.rules.drawThreeKeepTwo) return
-        val eligible =
-            initialCards(state).count { state.rules.initialCard.accepts(CardData.definition(it)) }
         checkRule(
-            eligible >= state.playerIds.size * 2 + 1,
+            state.rules.supportsInitialDeal(state.playerIds.size),
             ViolationCode.INSUFFICIENT_INITIAL_CARDS,
         )
     }

@@ -23,7 +23,7 @@ test('worker receives only policy input and never authentication or transport re
     const {client, workers} = fixture(context);
     const result = client.think(job, new AbortController().signal);
 
-    assert.deepEqual(Object.keys(workers[0].message).sort(), ['difficulty', 'id', 'observation', 'seed']);
+    assert.deepEqual(Object.keys(workers[0].message).sort(), ['difficulty', 'finish', 'id', 'initiative', 'observation', 'policyVersion', 'seed']);
     assert.deepEqual(workers[0].message.observation, job.observation);
     workers[0].answer('choose-capital genoa');
 

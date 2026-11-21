@@ -1,13 +1,14 @@
 package dev.aragos.aor
 
-/** Public circulation uses configured introductions and plays, never hidden card locations. */
+/**
+ * Public circulation uses configured introductions, plays and public discards, never hidden card
+ * locations.
+ */
 internal object CardAvailability {
     fun unplayed(state: GameState): List<CardDefinition> {
         if (state.stage == Stage.CONFIGURATION || state.stage == Stage.SHUFFLE) return emptyList()
-        return Epoch.entries
-            .filter { epoch -> epoch.number <= state.currentEpoch.number }
-            .flatMap(state.rules::cardsForEpoch)
-            .filterNot(state.playedCards::contains)
-            .map(CardData::definition)
+        val introduced = state.rules.introducedCards(state.currentEpoch)
+        if (state.publiclyDiscardedCards.isEmpty()) return introduced
+        return introduced.filterNot { card -> card.id in state.publiclyDiscardedCards }
     }
 }

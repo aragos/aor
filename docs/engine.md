@@ -40,6 +40,11 @@ latest recorded turn (turn 1 during setup). This includes turns removed by histo
 Earlier turns retain their recorded timing, so outcomes, live decisions and private work survive.
 The header's activation turn also governs replay and historical rewinds.
 
+The Caravan transit rule ignores white pieces. The header's `darkCaravanFromTurn` applies it
+from turn 1 in new games. Existing saves are archived and activate after the last Expansion with
+recorded play, including superseded revisions. Exports without the activation field retain the
+older full-occupancy rule during replay.
+
 Draw-three-keep-two is additive and disabled by default. Older creation revisions containing the
 original four options remain valid and retain the one-card setup and ordinary turn 1 draw. New
 creation revisions explicitly record the variant; returns and reshuffles replay without randomness.

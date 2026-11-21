@@ -1,4 +1,4 @@
-import {Fragment, useEffect, useRef, useState} from 'react';
+import {Fragment, useCallback, useEffect, useRef, useState} from 'react';
 import type {FormEvent, ReactNode} from 'react';
 import {initializeApp} from 'firebase/app';
 import {browserLocalPersistence, createUserWithEmailAndPassword, getAuth, GoogleAuthProvider, onIdTokenChanged,
@@ -7,6 +7,7 @@ import {browserLocalPersistence, createUserWithEmailAndPassword, getAuth, Google
 import type {Auth, User} from 'firebase/auth';
 import {errorCode, request, setAuthentication} from './api';
 import type {Account, ApplicationConfig, CreatedGame, GamePage, GameSummary, Session} from './api';
+import {AutomatedOpponents} from './AutomatedOpponents';
 import {ChoiceButtons} from './DecisionControls';
 import {defaultVariants, migrateVariants, validVariants, Variants} from './Variants';
 import {useStoredSetting, isUndoPolicy, isGameFilter} from './preferences';
@@ -52,6 +53,16 @@ function message(failure: unknown): string {
 }
 function Problem({value}: {value: string}) {return value ? <p className="error" role="alert">{value}</p> : null;}
 
+async function sendVerification(user: User) {
+    try {
+        await sendEmailVerification(user, {url: new URL('/play', window.location.origin).href});
+    } catch (failure) {
+        if (typeof failure !== 'object' || !failure || !('code' in failure) ||
+            failure.code !== 'auth/unauthorized-continue-uri') throw failure;
+        await sendEmailVerification(user);
+    }
+}
+
 function SignIn({auth}: {auth: Auth}) {
     const [mode, setMode] = useState('sign-in');
     const [email, setEmail] = useState('');
@@ -64,7 +75,7 @@ function SignIn({auth}: {auth: Auth}) {
         try {
             if (mode === 'sign-up') {
                 const result = await createUserWithEmailAndPassword(auth, email.trim(), password);
-                await sendEmailVerification(result.user);
+                await sendVerification(result.user);
             } else await signInWithEmailAndPassword(auth, email.trim(), password);
         } catch (failure) {setError(message(failure));}
         finally {setBusy(false);}
@@ -128,15 +139,35 @@ function Register({refresh}: {refresh: () => Promise<void>}) {
     </form></main>;
 }
 
-function VerifyEmail({user, refresh}: {user: User; refresh: () => Promise<void>}) {
+function VerifyEmail({user, refresh}: {user: User; refresh: (user: User) => Promise<void>}) {
     const [notice, setNotice] = useState('');
+    const pendingCheck = useRef<Promise<boolean> | null>(null);
+    const check = useCallback(() => {
+        if (pendingCheck.current) return pendingCheck.current;
+        const pending = (async () => {
+            await user.reload();
+            if (!user.emailVerified) return false;
+            await user.getIdToken(true);
+            await refresh(user);
+            return true;
+        })().finally(() => {pendingCheck.current = null;});
+        pendingCheck.current = pending;
+        return pending;
+    }, [user, refresh]);
+    useEffect(() => {
+        const stop = startPolling({intervalMs: 5000, paused: () => document.hidden,
+            poll: async () => {await check();}, onError: () => {}});
+        const onFocus = () => {void check().catch(() => {});};
+        window.addEventListener('focus', onFocus);
+        return () => {stop(); window.removeEventListener('focus', onFocus);};
+    }, [check]);
     const [error, setError] = useState('');
     const [busy, setBusy] = useState(false);
     async function action(resend: boolean) {
         setBusy(true); setError(''); setNotice('');
         try {
-            if (resend) {await sendEmailVerification(user); setNotice(t('hosted.verification-email-sent'));}
-            else {await user.reload(); await user.getIdToken(true); await refresh(); setNotice(t('hosted.if-verification-is-complete-your'));}
+            if (resend) {await sendVerification(user); setNotice(t('hosted.verification-email-sent'));}
+            else if (!await check()) setNotice(t('hosted.emailStillUnverified'));
         } catch (failure) {setError(message(failure));}
         finally {setBusy(false);}
     }
@@ -147,9 +178,12 @@ function VerifyEmail({user, refresh}: {user: User; refresh: () => Promise<void>}
     </main>;
 }
 
-function RegisteredGameForm({me}: {me: Account}) {
+function RegisteredGameForm({me, automataVersion}: {me: Account; automataVersion?: string}) {
     const [name, setName] = useState('');
     const [players, setPlayers] = useState<Account[]>([me]);
+    const [botCount, setBotCount] = useState(0);
+    const [pauseAfterPhase, setPauseAfterPhase] = useState(false);
+    const seatCount = players.length + botCount;
     const [query, setQuery] = useState('');
     const [matches, setMatches] = useState<Account[]>([]);
     const [variants, setVariants] = useStoredSetting('variants', defaultVariants, validVariants, migrateVariants);
@@ -166,14 +200,14 @@ function RegisteredGameForm({me}: {me: Account}) {
         return () => {current = false; clearTimeout(timer);};
     }, [query]);
     function addPlayer(player: Account) {
-        if (busy || players.length >= 6) return;
+        if (busy || seatCount >= 6) return;
         setPlayers(current => current.some(chosen => chosen.id === player.id) ? current : [...current, player]);
         setQuery('');
     }
     async function create(event: FormEvent) {
         event.preventDefault(); setBusy(true); setError('');
         try {
-            const result = await request<CreatedGame>('/api/games', undefined, {name: name.trim(), players: players.map(player => player.id), options: variants, undoPolicy});
+            const result = await request<CreatedGame>('/api/games', undefined, {name: name.trim(), players: players.map(player => player.id), bots: Array.from({length: botCount}, () => ({})), pauseAfterPhase: botCount > 0 && pauseAfterPhase, options: variants, undoPolicy});
             window.location.assign(`/games/${result.gameId}`);
         } catch (failure) {setError(message(failure)); setBusy(false);}
     }
@@ -181,19 +215,21 @@ function RegisteredGameForm({me}: {me: Account}) {
         {!me.mayCreateGames ? <p>{t('hosted.an-administrator-must-approve-your')}</p> : <form onSubmit={create}>
             <label htmlFor="game-name">{t('create.gameName')}</label>
             <input id="game-name" value={name} onChange={event => setName(event.target.value)} maxLength={80} required disabled={busy}/>
-            <h2>{t('hosted.players')}</h2><p>{t('hosted.choose-36-registered-players-including')}</p>
+            <h2>{t('hosted.players')}</h2><p>{t('hosted.choose-players')}</p>
             <ul className="player-directory">{players.map(player => <li key={player.id}><span><strong>@{player.handle}</strong></span>
                 {player.id !== me.id && <button type="button" className="secondary" disabled={busy} onClick={() => setPlayers(players.filter(candidate => candidate.id !== player.id))}>{t('hosted.remove')}</button>}</li>)}</ul>
             <label>{t('hosted.find-a-player-by-handle')}<input type="search" value={query} maxLength={60} onChange={event => setQuery(event.target.value)}/></label>
             {query.trim().length >= 2 && <ul className="player-directory" aria-label={t('hosted.matching-players')}>{matches.filter(player => !players.some(chosen => chosen.id === player.id)).map(player => <li key={player.id}>
-                <button type="button" className="player-handle" disabled={busy || players.length >= 6} onClick={() => addPlayer(player)}>@{player.handle}</button>
-                <button type="button" className="secondary" disabled={busy || players.length >= 6} onClick={() => addPlayer(player)}>{t('hosted.add')}</button>
+                <button type="button" className="player-handle" disabled={busy || seatCount >= 6} onClick={() => addPlayer(player)}>@{player.handle}</button>
+                <button type="button" className="secondary" disabled={busy || seatCount >= 6} onClick={() => addPlayer(player)}>{t('hosted.add')}</button>
             </li>)}</ul>}
+            <AutomatedOpponents count={botCount} onChange={setBotCount}
+                pauseAfterPhase={pauseAfterPhase} onPauseAfterPhaseChange={setPauseAfterPhase} humanCount={players.length} version={automataVersion} disabled={busy}/>
             <details className="creation-settings"><summary>{t('table.configuration')}</summary>
             <Variants value={variants} onChange={setVariants} disabled={busy}/>
             <p>{t('history.policy')} <HelpLink topic="history" label="Undo policies"/></p><ChoiceButtons label={t('history.policy')} value={undoPolicy} onChange={setUndoPolicy} disabled={busy} choices={['regular-turn', 'competitive', 'friendly-turn', 'linear-game'].map(value => ({value, label: t(`undoPolicy.${value}`)}))}/>
             {undoPolicy === 'linear-game' && <p className="small">{t('history.linearDescription')}</p>}</details>
-            <Problem value={error}/><button disabled={busy || players.length < 3}>{busy ? t('hosted.creating') : t('hosted.create-game')}</button>
+            <Problem value={error}/><button disabled={busy || seatCount < 3}>{busy ? t('hosted.creating') : t('hosted.create-game')}</button>
         </form>}
     </details>;
 }
@@ -276,7 +312,7 @@ function GameRow({game}: {game: GameSummary}) {
         <span className="game-row-stage">{game.stage && t(`stage.${game.stage}`)}</span></>;
 }
 
-export function Dashboard({me}: {me: Account}) {
+export function Dashboard({me, automataVersion}: {me: Account; automataVersion?: string}) {
     const [hasTurn, setHasTurn] = useState(false);
     useTurnFavicon(hasTurn);
     useEffect(() => startPolling({intervalMs: 30000, backgroundIntervalMs: 30000,
@@ -363,7 +399,7 @@ export function Dashboard({me}: {me: Account}) {
                     {page.nextCursor && <button className="secondary" disabled={busy} onClick={() => setCursor(page.nextCursor)}>{t('hosted.next-page')}</button>}</div>
             </div>
         </section>
-        <RegisteredGameForm me={me}/>
+        <RegisteredGameForm me={me} automataVersion={automataVersion}/>
         {all && <AdminPlayers/>}
         <footer className="privacy-footer"><a href="/privacy.html">{t('hosted.privacy-policy')}</a></footer>
     </main>;
@@ -379,7 +415,8 @@ export default function HostedApp({config, game}: {config: ApplicationConfig; ga
     sessionRef.current = session;
     const identity = useRef<string | null>(null);
     const refreshSequence = useRef(0);
-    async function refresh(next: User | null = auth.currentUser) {
+    const refresh = useCallback(async (next: User | null = auth.currentUser) => {
+        if (next !== auth.currentUser) return;
         const sequence = ++refreshSequence.current;
         const changed = identity.current !== (next?.uid ?? null);
         identity.current = next?.uid ?? null;
@@ -398,13 +435,13 @@ export default function HostedApp({config, game}: {config: ApplicationConfig; ga
         } finally {
             if (sequence === refreshSequence.current) setLoading(false);
         }
-    }
+    }, [auth]);
     useEffect(() => {
         setAuthentication(async () => auth.currentUser?.getIdToken());
         const unsubscribe = onIdTokenChanged(auth, next => {void refresh(next);});
         void setPersistence(auth, browserLocalPersistence).catch(() => { /* Firebase retains an in-memory session when storage is unavailable. */ });
         return () => {++refreshSequence.current; unsubscribe(); setAuthentication();};
-    }, [auth]);
+    }, [auth, refresh]);
     const ready = !loading && !error && user && session?.emailVerified && session.account;
     const logOut = () => {void signOut(auth).catch(failure => setError(message(failure)));};
     return <AccountContext.Provider value={ready ? {handle: ready.handle, signOut: logOut} : null}>
@@ -412,7 +449,7 @@ export default function HostedApp({config, game}: {config: ApplicationConfig; ga
             <button className="secondary" onClick={logOut}>{t('hosted.sign-out')}</button></nav>}
         {loading ? <main className="landing panel"><p>{t('hosted.loading-your-account')}</p></main> : !user ? <SignIn auth={auth}/>
             : error ? <main className="landing panel"><Problem value={error}/><button onClick={() => {void refresh();}}>{t('hosted.retry')}</button></main>
-            : !session?.emailVerified ? <VerifyEmail user={user} refresh={() => refresh()}/>
+            : !session?.emailVerified ? <VerifyEmail key={user.uid} user={user} refresh={refresh}/>
             : !session.account ? <Register refresh={() => refresh()}/>
-            : <div key={user.uid}>{game ?? <Dashboard me={session.account}/>}</div>}</AccountContext.Provider>;
+            : <div key={user.uid}>{game ?? <Dashboard me={session.account} automataVersion={config.automataVersion}/>}</div>}</AccountContext.Provider>;
 }

@@ -93,7 +93,7 @@ export function Controls({snapshot, busy, submit, quotePurchase}: {snapshot: Sna
             </div>}
         </DecisionForm>}
         {capitalChoices.length > 0 && <div className="capital-choices">{capitalChoices.map(choice => <button type="button" key={choice} className="secondary" disabled={busy} aria-pressed={capital === choice} onClick={() => setCapital(choice)}><CapitalLabel capital={choice.split(' ')[1]}>{t(`capital.${choice.split(' ')[1]}`)}</CapitalLabel></button>)}<DecisionAction className="capital-confirmation" disabled={busy || !capitalChoices.includes(capital)} onClick={() => { void submit(capital); }}>{t('table.confirm')}</DecisionAction></div>}
-        {capitalChoices.length > 0 && <MapPicker title={t('controls.chooseProvince')} eligible={capitalChoices.map(choice => choice.split(' ')[1])}
+        {capitalChoices.length > 0 && <MapPicker kind="capital" title={t('table.prompt.choose-capital')} eligible={capitalChoices.map(choice => choice.split(' ')[1])}
             selected={capital ? [capital.split(' ')[1]] : []} disabled={busy} onPick={id => setCapital(`choose-capital ${id}`)}/>}
         {stage === 'TURN_ORDER_TIE' && <div className="turn-tie">
             <p className="muted">{t('controls.provisionalOrder')}: {snapshot.game.provisionalTieOrder.length ? <PlayerLabels snapshot={snapshot} ids={snapshot.game.provisionalTieOrder} separator=" → "/> : t('controls.noPositions')}</p>

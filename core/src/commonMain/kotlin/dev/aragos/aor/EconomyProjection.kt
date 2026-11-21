@@ -54,7 +54,7 @@ data class CommodityPayoutView(
                     )
                 }
             }
-            val context = state.cardContext()
+            val context = state.cardContext
             val basis = CommodityHoldingBasis.CURRENT_MARKERS
             return Commodity.entries.map { commodity ->
                 val payment = CardRules.commodityPayment(context, commodity, basis)
@@ -158,6 +158,11 @@ data class ShippingOfferView(
             ) {
                 return null
             }
+            return forecast(state, viewer)
+        }
+
+        /** Current-capability quote only; this does not authorize an early shipping purchase. */
+        internal fun forecast(state: GameState, viewer: PlayerState): ShippingOfferView {
             return try {
                 val after = ShippingPurchases.upgrade(viewer, state.currentTurn()).player
                 ShippingOfferView(

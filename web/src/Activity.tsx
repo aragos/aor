@@ -5,7 +5,7 @@ import {advanceName, label, provinceName} from './labels';
 import {t} from './messages';
 import {Commodity, Emblem} from './TablePanels';
 import {CapitalLabel, LabelMessage} from './IdentityLabel';
-import {HelpLink} from './HelpLink';
+import {CommodityPayoutHelp} from './HelpLink';
 import {MiseryBox} from './MiseryBox';
 import {activityRows} from './activityRows';
 import {useMapSelection} from './map/MapSelection';
@@ -48,7 +48,9 @@ function ActivityCard({cardId, onInspectCard, inspection}: {
 }) {
     const name = inspection ? t(inspection.definition.messageId) : label(cardId, 'event');
     const commodities = inspection?.commodities ?? [];
-    if (commodities.length) return <span className="event-card">▤ {name}{commodities.map(commodity => <HelpLink key={commodity} topic={`commodity-${commodity.toLowerCase()}`} label={`${label(commodity, 'commodity')} · ${t('table.fullPayouts')}`}/>)}</span>;
+    if (commodities.length) return <span className="event-card">
+        ▤ {name}<CommodityPayoutHelp commodities={commodities}/>
+    </span>;
     return onInspectCard
         ? <button type="button" className="event-card" onClick={() => onInspectCard(cardId)}>▤ {name}</button>
         : <span className="event-card">▤ {name}</span>;
@@ -253,13 +255,14 @@ export function ActionResultNotice({event, snapshot, onDismiss}: {
     </ResultNotice>;
 }
 
-export function Activity({snapshot, onInspectCard, active, pinned, canPin, onTogglePin}: {
+export function Activity({snapshot, onInspectCard, active, pinned, canPin, onTogglePin, phasePause}: {
     snapshot: Snapshot; onInspectCard: (cardId: string) => void;
     active: boolean; pinned: boolean; canPin: boolean; onTogglePin: () => void;
+    phasePause?: ReactNode;
 }) {
     const rows = activityRows(snapshot.events).filter(row => row[0].kind !== 'PASS');
     const pinLabel = t(pinned ? 'table.unpinActivity' : 'table.pinActivity');
-    return <section id="workspace-activity" className="table-activity" hidden={!active && !pinned}
+    return <section id="workspace-activity" className="table-activity" hidden={!active && !pinned} tabIndex={-1}
         role={pinned ? 'region' : 'tabpanel'} aria-label={pinned ? t('table.activity') : undefined}
         aria-labelledby={pinned ? undefined : 'tab-activity'}>
         {canPin && <button type="button" className="secondary activity-pin" title={pinLabel}
@@ -271,6 +274,7 @@ export function Activity({snapshot, onInspectCard, active, pinned, canPin, onTog
             </svg>
             <span>{pinLabel}</span>
         </button>}
+        {phasePause}
         <div className="activity-body">
             {rows.length === 0 && <p>{t('table.noActivity')}</p>}
             <ol className="activity-list" tabIndex={0} aria-label={t('table.recentActivity')}>{[...rows].reverse().map(row => {

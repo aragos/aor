@@ -1,23 +1,28 @@
-import type {BotDifficulty} from './api';
 import {t} from './messages';
 
-export function AutomatedOpponents({value, onChange, humanCount, disabled = false}: {
-    value: BotDifficulty[]; onChange: (value: BotDifficulty[]) => void;
-    humanCount: number; disabled?: boolean;
+export function AutomatedOpponents({count, onChange, humanCount, version, disabled = false, pauseAfterPhase, onPauseAfterPhaseChange}: {
+    count: number; onChange: (count: number) => void;
+    humanCount: number; version?: string; disabled?: boolean;
+    pauseAfterPhase: boolean; onPauseAfterPhaseChange: (enabled: boolean) => void;
 }) {
     return <fieldset className="automated-opponents" disabled={disabled}>
         <legend>{t('bots.opponents')}</legend>
-        {value.map((difficulty, index) => <div className="automated-seat" key={index}>
-            <label htmlFor={`bot-difficulty-${index}`}>{t('bots.number', {number: index + 1})}</label>
-            <select id={`bot-difficulty-${index}`} value={difficulty} onChange={event => {
-                onChange(value.map((current, position) => position === index ? event.target.value as BotDifficulty : current));
-            }}>{(['EASY', 'NORMAL', 'HARD'] as const).map(level => <option key={level} value={level}>{t(`bots.difficulty.${level}`)}</option>)}</select>
+        <p className="muted small">{t('bots.experimental')}{version && <> {t('bots.updated', {version})}</>}</p>
+        {Array.from({length: count}, (_, index) => <div className="automated-seat" key={index}>
+            <span>{t('bots.number', {number: index + 1})}</span>
             <button type="button" className="secondary" aria-label={t('bots.removeNumber', {number: index + 1})}
-                onClick={() => onChange(value.filter((_, position) => position !== index))}>{t('hosted.remove')}</button>
+                onClick={() => onChange(count - 1)}>{t('hosted.remove')}</button>
         </div>)}
-        <button type="button" className="secondary" disabled={humanCount + value.length >= 6}
-            onClick={() => onChange([...value, 'NORMAL'])}>{t('bots.add')}</button>
-        {value.length > 0 && <p className="muted small">{t('bots.hosting')}</p>}
-        <p className="muted small">{t('bots.seatCount', {count: humanCount + value.length})}</p>
+        <button type="button" className="secondary" disabled={humanCount + count >= 6}
+            onClick={() => onChange(count + 1)}>{t('bots.add')}</button>
+        {count > 0 && <>
+            <label className="bot-phase-option">
+                <input type="checkbox" checked={pauseAfterPhase}
+                    onChange={event => onPauseAfterPhaseChange(event.target.checked)}/>
+                {t('bots.pauseAfterPhase')}
+            </label>
+            <p className="muted small">{t('bots.hosting')}</p>
+        </>}
+        <p className="muted small">{t('bots.seatCount', {count: humanCount + count})}</p>
     </fieldset>;
 }

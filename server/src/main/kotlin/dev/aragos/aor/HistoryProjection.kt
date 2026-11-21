@@ -98,6 +98,33 @@ internal object HistoryProjection {
         )
     }
 
+    /** [startEntry] is the number of effective entries before the completed activity. */
+    fun hasAutomatedDecision(
+        game: StoredGame,
+        startEntry: Int,
+        players: Set<PlayerId>,
+        excludeOrderSwaps: Boolean = false,
+    ): Boolean {
+        val entries = game.effectiveEntries().drop(startEntry)
+        val decisions = entries.mapNotNull { recorded ->
+            val action = TextCodec.parse(recorded.text) as? Entry.Action
+            val command = action?.command
+            recorded.id.takeIf {
+                action?.actor in players &&
+                    command != TurnCommand.Pass &&
+                    command != TurnCommand.BuyCard &&
+                    (!excludeOrderSwaps || command !is TurnCommand.SwapOrder)
+            }
+        }
+        if (decisions.isEmpty()) return false
+        val ids = decisions.toSet()
+        return forPlayer(game, viewer = null).events.any { event ->
+            (event.actor != null && event.id in ids) ||
+                (event.id == "${entries.first().id}:token_purchases" &&
+                    event.tokenPurchases.any { it.player in players })
+        }
+    }
+
     /** Public audit facts are shared by viewers; prefixes are bounded and local to this replay. */
     internal fun auditEvents(stored: StoredGame): List<HistoryEventView> {
         val events = mutableListOf<HistoryEventView>()
@@ -196,12 +223,15 @@ internal object HistoryProjection {
         return when {
             entry.actor != viewer && command is Command.ReturnCard ->
                 "${entry.actor}: return-card <hidden>"
-            entry.actor != viewer && command is TurnCommand.DiscardCard ->
-                "${entry.actor}: discard-card <hidden>"
             command is BoardCommand.OfferCard && viewer !in BoardGame.tradeParticipants(before) ->
                 "${entry.actor}: offer-card <hidden>"
-            command is CardCommand.PlayCard -> {
-                val reference = command.reference
+            command is CardCommand.PlayCard || command is TurnCommand.DiscardCard -> {
+                val reference =
+                    when (command) {
+                        is CardCommand.PlayCard -> command.reference
+                        is TurnCommand.DiscardCard -> command.reference
+                        else -> error("A public card action requires a card reference.")
+                    }
                 val card =
                     before.playerState(entry.actor).hand.singleOrNull { card ->
                         card.reference == reference
