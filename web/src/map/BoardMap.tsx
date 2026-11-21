@@ -5,6 +5,7 @@ import {createPortal} from 'react-dom';
 import {label, playerName, provinceName} from '../labels';
 import {t} from '../messages';
 import {HelpLink} from '../HelpLink';
+import {Commodity} from '../TablePanels';
 import {AccessLock, areaColors, CommodityIcon, commodityColors, LockedAreaPattern, PlayerPiece, SatellitePattern, SupportArrow} from './MapSymbols';
 import {useMapSelection} from './MapSelection';
 import {neighbors} from './ProvinceInspector';
@@ -100,7 +101,7 @@ function ProvinceLabel({province, pieces, snapshot, geometry, dimmed = false, co
 
 function occupancyDescription(snapshot: Snapshot, pieces?: ProvinceView): string {
     const owner = (id: string) => playerName(snapshot, id);
-    if (pieces?.marker) return t('board.markerOccupancy', {owner: owner(pieces.marker.owner), age: t(pieces.marker.side === 'WHITE' ? 'board.new' : 'board.old')});
+    if (pieces?.marker) return t('board.markerOccupancy', {owner: owner(pieces.marker.owner), age: t(pieces.marker.side === 'WHITE' ? 'board.new' : 'board.established')});
     return pieces?.tokens.map(tokens => t('board.tokenOccupancy', {owner: owner(tokens.owner), old: tokens.coloured, fresh: tokens.white})).join('; ') || t('table.unoccupied');
 }
 
@@ -407,10 +408,10 @@ function LoadedBoardMap({snapshot, busy, geometry, controlsHost}: BoardMapProps 
         : tooltipArea ? `${t('board.area')} ${tooltipArea}` : tooltipSea ? label(tooltipSea)
         : geometry.provinces[tooltipTarget] ? provinceName(tooltipTarget) : '';
     const tooltipDescription = tooltipProvince
-        ? (tooltipProvince.satellite ? t('board.satellite') : [
-            `${t('board.market')} ${tooltipProvince.marketNumber}`,
-            ...tooltipProvince.commodities.map(commodity => label(commodity, 'commodity')),
-        ].join(' · '))
+        ? (tooltipProvince.satellite ? t('board.satellite') : <span className="map-tooltip-market">
+            <span>{t('board.market')} {tooltipProvince.marketNumber}</span>
+            {tooltipProvince.commodities.map(commodity => <Commodity key={commodity} commodity={commodity}/>)}
+        </span>)
         : tooltipArea && areaAccess[tooltipArea]?.length ? t('board.requires', {advances: areaAccess[tooltipArea].map(requirement => label(requirement)).join(', ')})
         : tooltipSea && catalog.seaAreas[tooltipSea] ? `${t('board.area')} ${catalog.seaAreas[tooltipSea]}`
         : geometry.provinces[tooltipTarget] ? t('board.notUsed') : '';

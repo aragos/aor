@@ -90,6 +90,7 @@ export function GameTable({snapshot: liveSnapshot, busy: requestBusy, submit: se
         if (!mobile && workspace === 'players') setWorkspace('map');
     }, [mobile, setWorkspace, workspace]);
     const expandedMap = !mobile && workspace === 'map' && mapExpanded;
+    const mapSizeLabel = t(expandedMap ? 'board.minimizeMap' : 'board.expandMap');
     const activityPinned = pinActivity && wideScreen;
     const actionsCollapsed = mobile && sheetCollapsed;
     const previousWorkspace = useRef<Exclude<Workspace, 'activity'>>('map');
@@ -267,8 +268,9 @@ export function GameTable({snapshot: liveSnapshot, busy: requestBusy, submit: se
                 </nav>
                 <div className="map-controls" ref={setMapControlsHost} hidden={workspace !== 'map'}/>
                 {!mobile && workspace === 'map' && <button type="button" className="secondary map-size-toggle"
-                    aria-expanded={expandedMap} aria-controls="workspace-map" onClick={() => setMapExpanded(current => !current)}>
-                    {t(expandedMap ? 'board.minimizeMap' : 'board.expandMap')}
+                    title={mapSizeLabel} aria-label={mapSizeLabel} aria-expanded={expandedMap}
+                    aria-controls="workspace-map" onClick={() => setMapExpanded(current => !current)}>
+                    <TableIcon kind={expandedMap ? 'minimize' : 'expand'}/>
                 </button>}
             </div>
             <div className="workspace-main" hidden={workspace === 'activity' || workspace === 'players'}>
@@ -285,7 +287,7 @@ export function GameTable({snapshot: liveSnapshot, busy: requestBusy, submit: se
             </div>
             <Activity snapshot={liveSnapshot} onInspectCard={id => setInspection({kind: 'history-card', id})}
                 active={workspace === 'activity'} pinned={activityPinned && !expandedMap} canPin={wideScreen} onTogglePin={toggleActivityPin}/>
-            <div className="workspace-side">
+            <div className="workspace-side" hidden={expandedMap}>
                 <aside className={`decision-panel decision ${hasContext ? 'has-context' : ''} ${actionsCollapsed ? 'sheet-collapsed' : ''}`} aria-label={t(spectator ? 'table.spectatorView' : 'table.currentDecision')}
                     data-action-ready={actuallyActing && !inactive && !finished}>
                     <DecisionActions pass={!spectator && !inactive && canAct && snapshot.legalChoices.commands.includes('pass') &&

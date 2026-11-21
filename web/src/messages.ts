@@ -753,7 +753,7 @@ export const en: Record<string, string> = {
     'board.legend': '★ Capital. New pieces are white; old pieces provide expansion bases. Open a province for connections and access requirements.',
     'board.province': 'Province', 'board.market': 'Market', 'board.commodity': 'Commodity', 'board.pieces': 'Pieces',
     'board.landNeighbors': 'Land neighbors', 'board.coastalNeighbors': 'Coastal-water neighbors', 'board.supports': 'Supports', 'board.access': 'Required advances',
-    'board.satellite': 'Satellite', 'board.marker': 'Marker', 'board.new': 'new', 'board.old': 'old', 'board.noMatches': 'No matching provinces.',
+    'board.satellite': 'Satellite', 'board.marker': 'Marker', 'board.new': 'new', 'board.established': 'established', 'board.noMatches': 'No matching provinces.',
     'advance.showAll': 'Show all 26 advances and every player’s ownership', 'advance.priceHint': "Select an advance to see your price after credits and leader discounts.",
     'advance.name': 'Advance', 'advance.category': 'Category', 'advance.cost': 'Printed cost', 'advance.credit': 'Credit', 'advance.mr': 'MR',
     'advance.prerequisites': 'Prerequisites', 'advance.owners': 'Owned by', 'advance.noneOwned': 'You have no advances yet.',
