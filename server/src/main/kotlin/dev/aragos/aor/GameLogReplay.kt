@@ -24,6 +24,8 @@ internal fun replayUpgradedLog(header: JsonNode, entries: List<String>): GameSta
             dataVersion = dataVersion,
             drawRenaissanceFromTurn =
                 header["drawRenaissanceFromTurn"]?.takeUnless(JsonNode::isNull)?.integer() ?: 1,
+            darkCaravanFromTurn =
+                header["darkCaravanFromTurn"]?.takeUnless(JsonNode::isNull)?.integer(),
         )
     try {
         if (entries.map(TextCodec::parse).map(Entry::toText) != entries) {

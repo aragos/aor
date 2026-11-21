@@ -74,7 +74,6 @@ function Game({id, token, pollInterval = 1000}: {id: string; token?: string; pol
     const [connectionError, setConnectionError] = useState('');
     const [actionError, setActionError] = useState<ApiError | null>(null);
     const [busy, setBusy] = useState(false);
-    const [saved, setSaved] = useState(false);
     const busyRef = useRef(false);
     const sequence = useRef(0);
     const etag = useRef<string>(undefined);
@@ -152,12 +151,23 @@ function Game({id, token, pollInterval = 1000}: {id: string; token?: string; pol
         etag.current = undefined;
         const operationId = crypto.randomUUID();
         uncertainOperation.current = null;
-        setBusy(true); setActionError(null); setSaved(false);
+        setBusy(true); setActionError(null);
         try {
-            const accepted = await request<Snapshot>(`${path}/${endpoint}`, token, {expectedRevision: snapshot.revision, ...(['commands', 'plans', 'abandonment'].includes(endpoint) ? {operationId} : {}), ...operation});
+            const send = (expectedRevision: number) => request<Snapshot>(`${path}/${endpoint}`, token, {
+                expectedRevision, ...(['commands', 'plans', 'abandonment'].includes(endpoint) ? {operationId} : {}), ...operation,
+            });
+            const accepted = await send(snapshot.revision).catch(async failure => {
+                if (endpoint !== 'plans' || errorCode(failure) !== 'STALE_REVISION') throw failure;
+                const {snapshot: latest} = await requestSnapshot(path, token);
+                if (!latest || latest.status !== snapshot.status || latest.viewerId !== snapshot.viewerId ||
+                    latest.game.turnNumber !== snapshot.game.turnNumber || latest.game.stage !== snapshot.game.stage) throw failure;
+                acceptSnapshot(latest);
+                // The original owner version and preview token still guard the same plan and consequences.
+                return send(latest.revision);
+            });
             acceptSnapshot(accepted);
             activityAt.current = Date.now();
-            setConnectionError(''); setSaved(true); return accepted;
+            setConnectionError(''); return accepted;
         } catch (failure) {
             const code = errorCode(failure);
             if (isAccessFailure(code)) clearAuthorizedSnapshot(code);
@@ -179,7 +189,7 @@ function Game({id, token, pollInterval = 1000}: {id: string; token?: string; pol
 
     if (!snapshot) return <main className="landing panel"><h1><AppLogo/></h1>{connectionError ? <ErrorMessage code={connectionError}/> : <p>{t('game.loading')}</p>}
         <a href="/play">{t('game.new')}</a></main>;
-    return <MapSelectionProvider><GameTable botControls={<BotControls snapshot={snapshot} {...automation}/>} writeAbandonment={(operation, requestId) => mutate('abandonment', {operation, requestId}).then(Boolean)} loadRewindTargets={(revision, before) => request(`${path}/rewind-targets?expectedRevision=${revision}${before == null ? '' : `&before=${before}`}`, token)} snapshot={snapshot} busy={busy} saved={saved}
+    return <MapSelectionProvider><GameTable botControls={<BotControls snapshot={snapshot} {...automation}/>} writeAbandonment={(operation, requestId) => mutate('abandonment', {operation, requestId}).then(Boolean)} loadRewindTargets={(revision, before) => request(`${path}/rewind-targets?expectedRevision=${revision}${before == null ? '' : `&before=${before}`}`, token)} snapshot={snapshot} busy={busy}
         writePlan={(operation, actions, previewToken, expectedVersion = snapshot.planning?.version ?? null) => mutate('plans', {operation, actions, previewToken, expectedVersion})}
         quotePlan={actions => request<PlanningQuote>(`${path}/plans/preview`, token, {expectedRevision: snapshot.revision, actions}, undefined, {readOnly: true})}
         submit={command => mutate('commands', {command, expectedSubmissionVersion: snapshot.submissionVersion ?? null}).then(Boolean)} editHistory={(fromEntry, lines) => mutate('history', {fromEntry, lines}).then(Boolean)} connectionError={connectionError} actionError={actionError}

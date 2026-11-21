@@ -62,7 +62,15 @@ object BoardPlacementRules {
                 }
             }
         }
-        throw firstFailure ?: RuleViolation(ViolationCode.UNREACHABLE_PROVINCE)
+        if (firstFailure != null) throw firstFailure
+        val intermediate = ExpansionReach.blockedCaravanIntermediate(context, player, destination)
+        if (intermediate != null) {
+            throw RuleViolation(
+                ViolationCode.CARAVAN_INTERMEDIATE_OCCUPIED,
+                listOf(intermediate.value),
+            )
+        }
+        throw RuleViolation(ViolationCode.UNREACHABLE_PROVINCE)
     }
 
     /** All rejection checks run before the driver spends tokens, shipping capacity or any dice. */

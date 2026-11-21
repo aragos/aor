@@ -47,7 +47,7 @@ export async function checkTable(page, web, baseline) {
     assert.equal(await page.evaluate('window.uiCommands.length'), 0, 'Initial render cannot submit');
 
     assert.equal(await page.evaluate(`document.querySelector('.available-resources, .stock-details')`), null, 'Permanent resource section is omitted');
-    const incomeLabels = await page.evaluate(`[...document.querySelectorAll('.income-value')].map(element => ({text:element.textContent, title:element.title, label:element.getAttribute('aria-label')}))`);
+    const incomeLabels = await page.evaluate(`[...document.querySelectorAll('[data-help-topic="income-track"]')].map(element => ({text:element.textContent, title:element.title, label:element.getAttribute('aria-label')}))`);
     assert.equal(incomeLabels.length, baseline.game.players.length);
     for (const income of incomeLabels) {
         assert(!income.text.includes('+') && !income.text.toLowerCase().includes('income'), 'Income overview uses icon and unsigned amount');
@@ -55,7 +55,12 @@ export async function checkTable(page, web, baseline) {
     }
     await page.evaluate(`document.querySelector('.player-summary.is-viewer > summary').click()`);
     assert.equal(await page.evaluate(`document.querySelector('.player-summary.is-viewer button[data-help-topic="misery-track"]').getAttribute('aria-haspopup')`), 'dialog', 'Misery track opens a reference popup');
-    assert.equal(await page.evaluate(`document.querySelector('.player-summary.is-viewer button[data-help-topic="shipping-track"]').textContent`), '?', 'Shipping help sits beside its value');
+    assert.equal(await page.evaluate(`document.querySelectorAll('.player-summary .help-link').length`), 0, 'No separate question marks in player boxes');
+    await page.evaluate(`document.querySelector('.player-summary.is-viewer button[data-help-topic="shipping-track"]').focus(); document.activeElement.click()`);
+    await page.wait(`document.querySelector('.reference-dialog[open]')`, 'Ship value opens the track');
+    await page.evaluate(`document.querySelector('.reference-dialog .close-detail').click()`);
+    await page.wait(`!document.querySelector('.reference-dialog')`, 'Ship track closes');
+    assert.equal(await page.evaluate(`document.activeElement.dataset.helpTopic`), 'shipping-track');
     assert.equal(await page.evaluate(`document.querySelector('.player-summary.is-viewer .reference-track')`), null, 'Static tracks leave the game view');
     const offer = fixture.game.expansionOffers.find(offer => offer.primaryAction === 'PLACE' && offer.establishesMarker && offer.blockers.length === 0);
     assert(offer, 'Live fixture must expose a legal marker establishment');

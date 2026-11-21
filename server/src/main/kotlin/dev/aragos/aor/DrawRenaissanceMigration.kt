@@ -13,7 +13,8 @@ internal object DrawRenaissanceMigration {
         val header =
             source.header.copy(
                 rulesVersion = RULES_VERSION,
-                drawRenaissanceFromTurn = activationTurn(source),
+                drawRenaissanceFromTurn =
+                    source.latestRecordedTurn { _, next -> next.turnNumber } + 1,
             )
         val upgraded =
             source.copy(
@@ -39,26 +40,6 @@ internal object DrawRenaissanceMigration {
             "A Draw Card Renaissance upgrade must preserve exact history and current gameplay."
         }
         return upgraded
-    }
-
-    /** Removed revisions still replay under their original timing after a cross-turn rewind. */
-    private fun activationTurn(source: StoredGame): Int {
-        val prefixes = ReplayPrefixes(source.header, source.revisions)
-        var state = GameState(source.header)
-        var entries = emptyList<String>()
-        var latestTurn = 0
-        for (revision in source.revisions) {
-            val retained = revision.replaceFrom?.let(entries::take) ?: entries
-            if (revision.replaceFrom != null) {
-                state = prefixes.restore(entries, revision.replaceFrom)
-            }
-            for (line in revision.entries) {
-                state = prefixes.step(state, TextCodec.parse(line))
-                latestTurn = maxOf(latestTurn, state.turnNumber ?: 0)
-            }
-            entries = retained + revision.entries
-        }
-        return latestTurn + 1
     }
 
     fun run(store: ManagedGameStore): List<String> =

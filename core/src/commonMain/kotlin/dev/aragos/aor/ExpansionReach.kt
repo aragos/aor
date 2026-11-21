@@ -183,16 +183,44 @@ object ExpansionReach {
         destination: ProvinceId,
     ): List<ExpansionRoute.Caravan> {
         if (AdvanceId.CARAVAN !in profile.advances) return emptyList()
-        return context.configuration.landNeighbors[base]
-            .orEmpty()
-            .filter { via ->
-                via != destination &&
-                    connected(context.configuration.landBorders, via, destination) &&
-                    canEnter(profile, context.province(via)) &&
-                    !opponentFills(context, profile.player, via)
-            }
+        return caravanIntermediates(context, profile, base, destination)
+            .filterNot { via -> opponentFills(context, profile.player, via) }
             .map { via -> ExpansionRoute.Caravan(base, via) }
+            .toList()
     }
+
+    /** Explains a failed reach check when a full intermediate province blocks Caravan. */
+    internal fun blockedCaravanIntermediate(
+        context: BoardRulesContext,
+        player: PlayerId,
+        destination: ProvinceId,
+    ): ProvinceId? {
+        val profile = context.player(player)
+        if (
+            profile.chaos ||
+                AdvanceId.CARAVAN !in profile.advances ||
+                !canEnter(profile, context.province(destination))
+        ) {
+            return null
+        }
+        return context
+            .bases(player)
+            .asSequence()
+            .flatMap { base -> caravanIntermediates(context, profile, base, destination) }
+            .filter { via -> opponentFills(context, player, via) }
+            .minByOrNull(ProvinceId::value)
+    }
+
+    private fun caravanIntermediates(
+        context: BoardRulesContext,
+        profile: BoardPlayerProfile,
+        base: ProvinceId,
+        destination: ProvinceId,
+    ): Sequence<ProvinceId> =
+        context.configuration.landNeighbors[base].orEmpty().asSequence().filter { via ->
+            connected(context.configuration.landBorders, via, destination) &&
+                canEnter(profile, context.province(via))
+        }
 
     private fun shippingRoutes(
         context: BoardRulesContext,
@@ -343,10 +371,20 @@ object ExpansionReach {
         province: ProvinceId,
     ): Boolean =
         when (val occupants = context.board.pieces[province]) {
-            is ProvincePieces.Marker -> occupants.owner != player
+            is ProvincePieces.Marker ->
+                occupants.owner != player &&
+                    (!context.onlyDarkPiecesBlockCaravan || occupants.side == PieceSide.COLOURED)
             is ProvincePieces.Tokens ->
-                occupants.total == context.province(province).marketNumber &&
-                    occupants.holdings.keys.any { owner -> owner != player }
+                if (context.onlyDarkPiecesBlockCaravan) {
+                    occupants.holdings.values.sumOf(TokenHolding::coloured) ==
+                        context.province(province).marketNumber &&
+                        occupants.holdings.any { (owner, holding) ->
+                            owner != player && holding.coloured > 0
+                        }
+                } else {
+                    occupants.total == context.province(province).marketNumber &&
+                        occupants.holdings.keys.any { owner -> owner != player }
+                }
             null -> false
         }
 

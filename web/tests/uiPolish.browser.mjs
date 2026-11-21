@@ -37,6 +37,8 @@ async function checkMapToolbar(page, web) {
     await escape(page);
     await page.wait(`!document.querySelector('.reference-dialog')`, 'map key dismissal');
     assert.equal(await page.evaluate(`document.activeElement.matches('.map-zoom .help-link')`), true);
+    const visiblePhases = () => page.evaluate(`[...document.querySelectorAll('.phase-timeline li')].filter(phase => phase.checkVisibility()).length`);
+    let widePhases = 0;
     for (const width of [1440, 900, 390]) {
         await page.send('Emulation.setDeviceMetricsOverride', {width, height: 1000, deviceScaleFactor: 1, mobile: width < 700});
         await page.evaluate(`new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))`);
@@ -51,6 +53,12 @@ async function checkMapToolbar(page, web) {
         if (layout.visible) assert(layout.barBottom <= layout.mapTop + 1, 'Controls sit above the map');
         assert.equal(await page.evaluate(`document.querySelector('#bid').value`), '7', 'Resizing preserves the bid');
         assert.equal(await page.evaluate(`document.documentElement.scrollWidth <= innerWidth`), true);
+        if (width === 1440) widePhases = await visiblePhases();
+        if (width === 390) {
+            assert(await visiblePhases() < widePhases, 'Timeline reveals more phases when there is room');
+            assert.equal(await page.evaluate(`document.querySelector('.map-size-toggle')`), null);
+        }
+        assert.equal(await page.evaluate(`document.querySelector('.phase-timeline [aria-current=step]').textContent`), 'Capital bids');
         await page.viewportScreenshot(join(process.env.AOR_BROWSER_ARTIFACTS, `map-toolbar-${width}.png`));
     }
     await page.send('Emulation.setDeviceMetricsOverride', {width: 1440, height: 1000, deviceScaleFactor: 1, mobile: false});
@@ -62,6 +70,44 @@ async function checkMapToolbar(page, web) {
     await page.evaluate(`document.querySelector('.world-map').dispatchEvent(new KeyboardEvent('keydown', {key: '0', bubbles: true}))`);
     await page.wait(`document.querySelector('.world-map').getAttribute('viewBox') !== ${JSON.stringify(narrow)}`, 'keyboard controls remain available');
     await page.evaluate(`document.querySelector('.game-table').style.removeProperty('width')`);
+    const mapWidth = () => page.evaluate(`document.querySelector('.world-map').getBoundingClientRect().width`);
+    const compactWidth = await mapWidth();
+    await page.click('Expand map');
+    assert((await mapWidth()) > compactWidth + 200, 'Expanded desktop map uses the action column width');
+    assert.equal(await page.evaluate(`document.querySelector('#bid').value`), '7', 'Expanding preserves the current decision draft');
+    await page.viewportScreenshot(join(process.env.AOR_BROWSER_ARTIFACTS, 'expanded-map.png'));
+    await page.click('Minimize map');
+    assert.equal(await mapWidth(), compactWidth);
+
+    for (const [seat, link] of game.links.entries()) await game.send(link, `bid-capital ${3 - seat}`);
+    const first = game.links[0];
+    const choosing = await game.snapshot(first);
+    assert.equal(choosing.game.stage, 'CAPITAL_CHOICE');
+    const choices = choosing.legalChoices.commands.map(command => command.split(' ')[1]);
+    await page.send('Page.navigate', {url: new URL(first.path, web).href});
+    await page.wait(`document.querySelector('[data-capital-choice]')`, 'Eligible capital markers on the live map');
+    assert.deepEqual(await page.evaluate(`[...document.querySelectorAll('[data-capital-choice]')].map(choice => choice.dataset.capitalChoice)`), choices);
+    const target = choices[0];
+    const marker = await page.evaluate(`(() => {
+        const {x, y, width, height} = document.querySelector('[data-capital-choice="${target}"] circle').getBoundingClientRect();
+        return {x: x + width / 2, y: y + height / 2};
+    })()`);
+    await page.send('Input.dispatchMouseEvent', {type: 'mouseMoved', ...marker});
+    await page.wait(`document.querySelector('.map-tooltip strong')?.textContent`, 'Larger capital tooltip on hover');
+    assert.equal(await page.evaluate(`parseFloat(getComputedStyle(document.querySelector('.map-tooltip strong')).fontSize) >= 16`), true);
+    await page.viewportScreenshot(join(process.env.AOR_BROWSER_ARTIFACTS, 'capital-picker.png'));
+    await page.send('Input.dispatchMouseEvent', {type: 'mousePressed', button: 'left', clickCount: 1, ...marker});
+    await page.send('Input.dispatchMouseEvent', {type: 'mouseReleased', button: 'left', clickCount: 1, ...marker});
+    await page.wait(`document.querySelector('[data-capital-choice="${target}"][data-selected=true]')`, 'Capital map selection prepares confirmation');
+    assert.equal((await game.snapshot(first)).revision, choosing.revision);
+    await page.send('Emulation.setDeviceMetricsOverride', {width: 390, height: 844, deviceScaleFactor: 1, mobile: true});
+    await page.wait(`document.querySelector('#tab-players') && document.querySelector('.capital-confirmation:not(:disabled)')`, 'Capital choice stays ready on the phone');
+    assert.equal(await page.evaluate(`document.documentElement.scrollWidth <= innerWidth`), true);
+    await page.viewportScreenshot(join(process.env.AOR_BROWSER_ARTIFACTS, 'capital-picker-phone.png'));
+    await page.click('Confirm');
+    await page.wait(`!document.querySelector('[data-capital-choice]')`, 'Committed capital clears its map targets');
+    assert.equal((await game.snapshot(first)).game.players.find(player => player.id === first.id).capital, target);
+    await page.send('Emulation.setDeviceMetricsOverride', {width: 1440, height: 1000, deviceScaleFactor: 1, mobile: false});
 }
 
 async function liveNoEffectOffer() {

@@ -60,6 +60,8 @@ internal object GameDocuments {
                 dataVersion = node.field("dataVersion").string(),
                 drawRenaissanceFromTurn =
                     node["drawRenaissanceFromTurn"]?.takeUnless(JsonNode::isNull)?.integer() ?: 1,
+                darkCaravanFromTurn =
+                    node["darkCaravanFromTurn"]?.takeUnless(JsonNode::isNull)?.integer(),
             )
         val credentialNode = root.field("credentials")
         require(credentialNode.isObject) {
@@ -467,12 +469,16 @@ internal object GameDocuments {
                     state
                 }
                 revision.storageArchive != null &&
-                    revision.command == "upgrade-draw-renaissance" -> {
+                    revision.command in
+                        setOf("upgrade-draw-renaissance", "upgrade-caravan-transit") -> {
+                    val drawUpgrade = revision.command == "upgrade-draw-renaissance"
                     require(
                         index > 0 &&
-                            game.header.rulesVersion == RULES_VERSION &&
+                            (if (drawUpgrade) game.header.rulesVersion == RULES_VERSION
+                            else game.header.darkCaravanFromTurn != null) &&
                             revision.author == game.header.creatorId &&
-                            revision.adminAuthor == "system-draw-renaissance" &&
+                            revision.adminAuthor ==
+                                revision.command.replaceFirst("upgrade-", "system-") &&
                             revision.administrativeAction == null &&
                             revision.at > 0 &&
                             revision.entries.isEmpty() &&
@@ -480,7 +486,7 @@ internal object GameDocuments {
                             revision.undoPolicy == null &&
                             revision.storageArchive.matches(ARCHIVE_PATTERN)
                     ) {
-                        "A Draw Card Renaissance upgrade must archive its source and preserve history."
+                        "A rules timing upgrade must archive its source and preserve history."
                     }
                     state
                 }

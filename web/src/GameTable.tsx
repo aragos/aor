@@ -10,6 +10,7 @@ import {CommandDock} from './CommandDock';
 import {TableTools} from './TableTools';
 import {Activity, ActionResultNotice} from './Activity';
 import {TableIcon} from './TableIcon';
+import {PhaseTimeline} from './PhaseTimeline';
 import {FinalScores} from './FullGamePanels';
 import {AdvanceTiles, PlayerOverview, Markets} from './TablePanels';
 import {Hand} from './Hand';
@@ -41,8 +42,8 @@ export type QuotePurchase = (amount: number) => Promise<PurchaseQuote>;
 const ACTIVITY_PIN_QUERY = '(min-width: 1400px)';
 const MOBILE_QUERY = '(max-width: 700px)';
 
-export function GameTable({snapshot: liveSnapshot, busy: requestBusy, saved, submit: sendCommand, connectionError, actionError, quotePurchase, editHistory, writePlan, quotePlan, loadRewindTargets, writeAbandonment, botControls}: {
-    snapshot: Snapshot; busy: boolean; saved: boolean; submit: (command: string) => Promise<boolean>;
+export function GameTable({snapshot: liveSnapshot, busy: requestBusy, submit: sendCommand, connectionError, actionError, quotePurchase, editHistory, writePlan, quotePlan, loadRewindTargets, writeAbandonment, botControls}: {
+    snapshot: Snapshot; busy: boolean; submit: (command: string) => Promise<boolean>;
     connectionError: string; actionError: ApiError | null; quotePurchase: QuotePurchase;
     editHistory?: (fromEntry: number, lines: string[]) => Promise<boolean>;
     writePlan?: WritePlan; quotePlan?: QuotePlan; loadRewindTargets?: LoadRewindTargets; writeAbandonment?: WriteAbandonment;
@@ -59,6 +60,7 @@ export function GameTable({snapshot: liveSnapshot, busy: requestBusy, saved, sub
     const [rewindTarget, setRewindTarget] = useState<RewindTarget | null>(null);
     useEffect(() => {if (liveSnapshot.status && liveSnapshot.status !== 'ACTIVE') setRewindTarget(null);}, [liveSnapshot.status]);
     const [mapControlsHost, setMapControlsHost] = useState<HTMLDivElement | null>(null);
+    const [mapExpanded, setMapExpanded] = useState(false);
     const [scoresOpen, setScoresOpen] = useState(snapshot.game.stage === 'FINISHED');
     const finished = snapshot.game.stage === 'FINISHED';
     useEffect(() => setScoresOpen(finished), [finished]);
@@ -87,6 +89,7 @@ export function GameTable({snapshot: liveSnapshot, busy: requestBusy, saved, sub
     useEffect(() => {
         if (!mobile && workspace === 'players') setWorkspace('map');
     }, [mobile, setWorkspace, workspace]);
+    const expandedMap = !mobile && workspace === 'map' && mapExpanded;
     const activityPinned = pinActivity && wideScreen;
     const actionsCollapsed = mobile && sheetCollapsed;
     const previousWorkspace = useRef<Exclude<Workspace, 'activity'>>('map');
@@ -227,7 +230,7 @@ export function GameTable({snapshot: liveSnapshot, busy: requestBusy, saved, sub
             <header className="game-header">
                 <div className="game-brand"><h1><a className="games-home" href="/play" aria-label={t('hosted.my-games')}><AppLogo/></a></h1><div className="game-heading"><strong className="game-name" title={snapshot.name}>{snapshot.name}</strong>
                     <p>{snapshot.game.turnNumber !== null && `${t('game.turn')} ${snapshot.game.turnNumber} · `}{snapshot.game.endingTriggered && !finished && <span className="ending-status" role="status" title={t('game.endingNotice')}>{t('game.finalTurn')} · </span>}<span className="epoch-progress"><HelpLink topic="unplayed-cards" compact={false} label={t('reference.unplayedCardsTitle')}>{t('game.epochProgress', {epoch: snapshot.game.currentEpoch, cards: snapshot.game.deckRemaining})}</HelpLink></span></p></div></div>
-                <div className="header-stage"><strong>{t(`stage.${snapshot.game.stage}`)}</strong>{spectator && <span className="spectator-status">{t('table.spectating')}</span>}</div>
+                <PhaseTimeline stage={liveSnapshot.game.stage} spectator={spectator}/>
                 {me && !snapshot.accountId && <details className="private-seat-link"><summary>{t('links.yourSeat').replace('{name}', me.name)}</summary>
                     <p>{t('links.keepPrivate')}</p><a className="button secondary" download="aor-private-seat.txt"
                         href={`data:text/plain;charset=utf-8,${encodeURIComponent(`${me.name}\n${window.location.href}\n`)}`}>{t('links.save')}</a>
@@ -238,7 +241,7 @@ export function GameTable({snapshot: liveSnapshot, busy: requestBusy, saved, sub
             {inactive && <p className="ending-notice" role="status">{snapshot.status === 'ABANDONED' && snapshot.events.some(event => event.kind === 'ABANDONMENT_AGREE' && event.detail === 'UNANIMOUS') ? t('abandonment.ended') : t('hosted.inactive', {status: t(`gameStatus.${snapshot.status}`).toLowerCase()})}</p>}
             {connectionError && <p className="error connection-error" role="alert">{t(`error.${connectionError}`)}</p>}
         </div>
-        <div className="table-workspace" data-activity-pinned={activityPinned}>
+        <div className="table-workspace" data-activity-pinned={activityPinned && !expandedMap} data-map-expanded={expandedMap}>
             <section id="workspace-players" className="players-workspace" hidden={mobile && workspace !== 'players'}
                 role={mobile ? 'tabpanel' : 'region'} aria-label={mobile ? undefined : t('table.players')}
                 aria-labelledby={mobile ? 'tab-players' : undefined}>
@@ -263,6 +266,10 @@ export function GameTable({snapshot: liveSnapshot, busy: requestBusy, saved, sub
                         }}><TableIcon kind={tab === 'markets' ? 'commodities' : tab}/><span>{t(`table.${tab}`)}</span>{tab === 'advances' && me && <small>{me.advances.length}</small>}</button>)}
                 </nav>
                 <div className="map-controls" ref={setMapControlsHost} hidden={workspace !== 'map'}/>
+                {!mobile && workspace === 'map' && <button type="button" className="secondary map-size-toggle"
+                    aria-expanded={expandedMap} aria-controls="workspace-map" onClick={() => setMapExpanded(current => !current)}>
+                    {t(expandedMap ? 'board.minimizeMap' : 'board.expandMap')}
+                </button>}
             </div>
             <div className="workspace-main" hidden={workspace === 'activity' || workspace === 'players'}>
                 <div id="workspace-map" role="tabpanel" aria-labelledby="tab-map" hidden={workspace !== 'map'}>
@@ -277,13 +284,17 @@ export function GameTable({snapshot: liveSnapshot, busy: requestBusy, saved, sub
                 </section>}
             </div>
             <Activity snapshot={liveSnapshot} onInspectCard={id => setInspection({kind: 'history-card', id})}
-                active={workspace === 'activity'} pinned={activityPinned} canPin={wideScreen} onTogglePin={toggleActivityPin}/>
+                active={workspace === 'activity'} pinned={activityPinned && !expandedMap} canPin={wideScreen} onTogglePin={toggleActivityPin}/>
             <div className="workspace-side">
-                <aside className={`decision-panel decision ${hasContext ? 'has-context' : ''} ${actionsCollapsed ? 'sheet-collapsed' : ''}`} aria-label={t(spectator ? 'table.spectatorView' : 'table.currentDecision')}>
+                <aside className={`decision-panel decision ${hasContext ? 'has-context' : ''} ${actionsCollapsed ? 'sheet-collapsed' : ''}`} aria-label={t(spectator ? 'table.spectatorView' : 'table.currentDecision')}
+                    data-action-ready={actuallyActing && !inactive && !finished}>
                     <DecisionActions pass={!spectator && !inactive && canAct && snapshot.legalChoices.commands.includes('pass') &&
                         <button type="button" className={`pass-action ${snapshot.prompt?.messageId.startsWith('prompt.purchase-') ? 'purchase-continuation' : ''} ${snapshot.prompt?.messageId === 'prompt.renaissance' ? 'renaissance-pass' : ''}`} disabled={busy} onClick={() => { void submit('pass'); }}>{planner.open && <>{t('plan.add')} · </>}{purchasePassLabel(snapshot)}</button>}>
                     <div className={`decision-toolbar ${objectAction ? 'object-heading' : ''}`}>
-                        <h2 id="decision-title" aria-live="polite" aria-atomic="true">{objectAction ? selectedName ? t(selectedName) : label(selectedAdvance, 'advance') : decision}</h2>
+                        <div className="decision-title-group">
+                            {objectAction && <span className="decision-action-label">{decision}</span>}
+                            <h2 id="decision-title" aria-live="polite" aria-atomic="true">{objectAction ? selectedName ? t(selectedName) : label(selectedAdvance, 'advance') : decision}</h2>
+                        </div>
                         {!spectator && !inactive && !planner.open && (withdrawing || snapshot.undo?.available) && <button type="button"
                             className={`secondary undo-action ${withdrawing ? 'withdraw-bid' : ''}`} disabled={busy}
                             title={undoDescription} aria-label={withdrawing ? `${t('history.undo')}: ${undoDescription}` : undoDescription}
@@ -331,7 +342,7 @@ export function GameTable({snapshot: liveSnapshot, busy: requestBusy, saved, sub
                     {!spectator && !inactive && <Controls key={decisionKey} snapshot={snapshot} busy={busy} submit={submit} quotePurchase={quotePurchase}/>}
                     </PlanningActions>
                     {actionError && <DiagnosticMessage failure={actionError} snapshot={snapshot}/>}
-                    {(requestBusy || saved && !planner.supported && !['BIDDING', 'TOKEN_PURCHASE'].includes(snapshot.game.stage)) && <p className="save-status" aria-live="polite">{t(requestBusy ? 'status.working' : 'status.saved')}</p>}
+                    {requestBusy && <p className="save-status" aria-live="polite">{t('status.working')}</p>}
                     </div>
                     </div>
 

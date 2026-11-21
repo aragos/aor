@@ -91,7 +91,7 @@ export async function checkGameplayImprovements(page, web, baseline) {
     assert.equal(await page.evaluate(`document.querySelectorAll('.decision-panel .province-inspector, .decision-panel .province-details').length`), 0);
     assert(me.capital && (await page.evaluate('document.title')).toLowerCase().includes(me.capital), 'Page title identifies the capital');
     assert.equal(await page.evaluate(`[...document.querySelectorAll('button')].some(button => /inspect/i.test(button.textContent))`), false, 'Objects do not have parallel Inspect controls');
-    assert.equal(await page.evaluate(`document.querySelector('.player-stats .help-link').getBoundingClientRect().width <= 14`), true, 'Track help looks like a footnote');
+    assert.equal(await page.evaluate(`document.querySelector('.player-stats [data-help-topic="misery-track"] .misery-box') !== null`), true, 'The misery value itself opens track help');
 
     const stone = baseline.game.cardInspections.find(card => card.definition.id === 'stone-1').definition;
     const cashChanges = [{player: viewer, before: 40, after: 42}];

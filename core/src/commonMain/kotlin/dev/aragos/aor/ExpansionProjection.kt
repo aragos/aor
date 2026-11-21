@@ -136,7 +136,15 @@ internal object ExpansionProjection {
         val evaluated =
             if (controlled) null else evaluate(context, viewer, province.id, required, routes)
         val plan = evaluated?.plan
-        val blocker = evaluated?.blocker
+        val blocker =
+            if (
+                evaluated?.blocker == ViolationCode.UNREACHABLE_PROVINCE &&
+                    ExpansionReach.blockedCaravanIntermediate(context, player, province.id) != null
+            ) {
+                ViolationCode.CARAVAN_INTERMEDIATE_OCCUPIED
+            } else {
+                evaluated?.blocker
+            }
         val partial =
             if (controlled) {
                 emptyList()
