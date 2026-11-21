@@ -75,6 +75,43 @@ class TrainingTest {
     }
 
     @Test
+    fun restartedExpansionMatchesTheSameForcedMovePlayedFromSetup() {
+        val setup = TrainingMatrix.stratified.first()
+        val competitors = List(setup.playerCount) { Competitor(BotModels.default) }
+        var continuation: ExpansionContinuation? = null
+        var selected = ""
+        fun fromSetup(futureSeed: Int): SimulatedGame {
+            var captured = false
+            return Simulation()
+                .play(
+                    setup,
+                    19790531,
+                    competitors,
+                    collectCoverage = false,
+                    rollout =
+                        RolloutDecision { seat, observation, ordinary ->
+                            if (captured || seat != 0 || observation.decision != "expand")
+                                return@RolloutDecision null
+                            val alternative =
+                                observation.candidates.firstOrNull { it.command != ordinary }
+                                    ?: return@RolloutDecision null
+                            captured = true
+                            selected = alternative.command
+                            BranchMove(selected, futureSeed) {
+                                if (continuation == null) continuation = it
+                            }
+                        },
+                )
+        }
+        for (future in listOf(331, 719)) {
+            val full = fromSetup(future)
+            val resumed =
+                checkNotNull(continuation) { "The test game needs a fork." }.play(selected, future)
+            assertThat(resumed.copy(elapsedMillis = full.elapsedMillis)).isEqualTo(full)
+        }
+    }
+
+    @Test
     fun reportedSixPlayerTrainingSeedCompletesAndReplays() {
         val configuration =
             TrainingConfiguration(

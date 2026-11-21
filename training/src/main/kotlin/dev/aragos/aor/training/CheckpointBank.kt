@@ -193,11 +193,12 @@ internal object CheckpointBank {
     private fun collect(world: World, futures: Int, play: (RolloutDecision) -> Double): Origin {
         val target = (world.seed ushr 8) % 12
         var alternatives = emptyList<ExpansionResponse.Alternative>()
-        var games = 0
-        fun branch(future: Int, action: Int?): Double {
-            var visited = 0
-            games++
-            return play(
+        var continuation: ExpansionContinuation? = null
+        var ordinaryCommand = ""
+        var visited = 0
+        fun futureSeed(future: Int): Int = world.seed xor (future + 1) * 1103515245
+        val baseline =
+            play(
                 RolloutDecision { seat, observation, ordinary ->
                     if (
                         seat != world.seat ||
@@ -205,25 +206,25 @@ internal object CheckpointBank {
                             visited++ != target
                     )
                         return@RolloutDecision null
-                    val options = ExpansionResponse.alternatives(observation, ordinary)
-                    if (games == 1) alternatives = options
-                    else
-                        check(options == alternatives) {
-                            "A paired continuation must reach the identical originating decision."
-                        }
-                    BranchMove(
-                        action?.let { alternatives[it].command } ?: ordinary,
-                        world.seed xor (future + 1) * 1103515245,
-                    )
+                    alternatives = ExpansionResponse.alternatives(observation, ordinary)
+                    ordinaryCommand = ordinary
+                    BranchMove(ordinary, futureSeed(0)) { continuation = it }
                 }
             )
-        }
-        val baseline = branch(0, null)
         val gains = DoubleArray(alternatives.size)
+        var games = 1
         if (alternatives.isNotEmpty()) {
+            val origin = checkNotNull(continuation) { "Expansion alternatives require an origin." }
+            fun score(command: String, seed: Int): Double {
+                games++
+                return origin.play(command, seed).winShare(world.seat)
+            }
             for (future in 0 until futures) {
-                val before = if (future == 0) baseline else branch(future, null)
-                for (i in alternatives.indices) gains[i] += branch(future, i) - before
+                val seed = futureSeed(future)
+                val before = if (future == 0) baseline else score(ordinaryCommand, seed)
+                for ((index, alternative) in alternatives.withIndex()) {
+                    gains[index] += score(alternative.command, seed) - before
+                }
             }
         }
         return Origin(

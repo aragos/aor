@@ -32,7 +32,16 @@ data class Competitor(
 )
 
 /** A rollout overrides one observed action and restarts future chance from the paired seed. */
-data class BranchMove(val command: String, val futureSeed: Int)
+data class BranchMove(
+    val command: String,
+    val futureSeed: Int,
+    val capture: ((ExpansionContinuation) -> Unit)? = null,
+)
+
+/** An offline fork at one expansion. Each call starts with the same immutable hidden world. */
+fun interface ExpansionContinuation {
+    fun play(command: String, futureSeed: Int): SimulatedGame
+}
 
 fun interface RolloutDecision {
     fun branch(seat: Int, observation: BotObservation, ordinary: String): BranchMove?
@@ -95,7 +104,7 @@ class Simulation(private val maxDecisions: Int = 12000) {
             "Every simulated seat requires one competitor."
         }
         val started = System.nanoTime()
-        var random = Random(seed)
+        val random = Random(seed)
         val entries = if (verifyReplay) mutableListOf<Entry>() else null
         val players =
             (1..configuration.playerCount).map { number ->
@@ -110,14 +119,44 @@ class Simulation(private val maxDecisions: Int = 12000) {
         val start = TextCodec.parseAction("start", state, actor = players.first().id)
         entries?.add(start)
         state = state.step(start)
-        state = resolve(state, random, entries)
+        return finish(
+            configuration,
+            seed,
+            competitors,
+            deadlineNanos,
+            started,
+            state,
+            0,
+            random,
+            entries,
+            collectCoverage,
+            rollout,
+        )
+    }
+
+    private fun finish(
+        configuration: TrainingConfiguration,
+        seed: Int,
+        competitors: List<Competitor>,
+        deadlineNanos: Long,
+        started: Long,
+        initial: GameState,
+        initialStep: Int,
+        initialRandom: Random,
+        entries: MutableList<Entry>?,
+        collectCoverage: Boolean,
+        rollout: RolloutDecision?,
+    ): SimulatedGame {
+        var random = initialRandom
+        var state = resolve(initial, random, entries)
+        val players = state.header.players
         val decisions = mutableMapOf<String, Int>()
         val families = mutableMapOf<String, Int>()
         val cards = mutableSetOf<String>()
         val capitals = mutableSetOf<String>()
         val epochs = mutableSetOf<Int>()
         val features = mutableSetOf<String>()
-        var step = 0
+        var step = initialStep
         while (state.stage != Stage.FINISHED) {
             if (Thread.currentThread().isInterrupted || System.nanoTime() >= deadlineNanos) {
                 throw CancellationException(
@@ -176,7 +215,34 @@ class Simulation(private val maxDecisions: Int = 12000) {
                             competitor.model,
                         )
                 val branch = rollout?.branch(seat, observation, ordinary)
-                if (branch != null) random = Random(branch.futureSeed)
+                if (branch != null) {
+                    random = Random(branch.futureSeed)
+                    branch.capture?.let { capture ->
+                        check(prompt is Prompt.SinglePlayer && choice == "expand") {
+                            "Only a single player's expansion can start a continuation."
+                        }
+                        val origin = state
+                        val nextStep = step + 1
+                        capture(
+                            ExpansionContinuation { command, futureSeed ->
+                                val action = TextCodec.parseAction(command, origin, actor = actor)
+                                finish(
+                                    configuration,
+                                    seed,
+                                    competitors,
+                                    deadlineNanos,
+                                    System.nanoTime(),
+                                    origin.step(action),
+                                    nextStep,
+                                    Random(futureSeed),
+                                    entries = null,
+                                    collectCoverage = false,
+                                    rollout = null,
+                                )
+                            }
+                        )
+                    }
+                }
                 val command = branch?.command ?: ordinary
                 if (collectCoverage) {
                     observation.candidates.flatMapTo(features) { it.features.keys }
