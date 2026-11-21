@@ -228,6 +228,50 @@ class TurnOrderTest {
     }
 
     @Test
+    fun chaosPlayersAreOrderedAfterActiveZeroBiddersInReverseCapitalOrder() {
+        val state =
+            purchasing(5)
+                .withChaos("p1", "p4")
+                .play("p2: buy-tokens 0", "p3: buy-tokens -1", "p5: buy-tokens 2")
+
+        assertThat(state.turnOrder)
+            .containsExactlyElementsIn(listOf("p3", "p2", "p4", "p1", "p5").map(::PlayerId))
+            .inOrder()
+        assertThat(state.stage).isEqualTo(Stage.DRAW_CARD)
+    }
+
+    @Test
+    fun activeZeroBiddersOnlyChooseTheirOrderRelativeToEachOther() {
+        val tied = purchasing(4).withChaos("p1", "p3").play("p2: buy-tokens 0", "p4: buy-tokens 0")
+
+        assertThat(tied.prompts())
+            .containsExactly(Prompt.SinglePlayer(PlayerId("p4"), "choose-turn-position"))
+        assertThat(tied.legalChoices(PlayerId("p4")).commands)
+            .containsExactly("choose-turn-position 1", "choose-turn-position 2")
+        assertThat(tied.play("p4: choose-turn-position 1").turnOrder)
+            .containsExactlyElementsIn(listOf("p4", "p2", "p3", "p1").map(::PlayerId))
+            .inOrder()
+    }
+
+    @Test
+    fun recordedChaosTieChoicesStillApplyBeforeActivation() {
+        val original = purchasing().withChaos("p2", "p3")
+        val historical =
+            original.copy(header = original.header.copy(automaticChaosOrderFromTurn = 2))
+
+        val replayed = historical.play("p1: buy-tokens -1", "p3: choose-turn-position 2")
+
+        assertThat(replayed.turnOrder).containsExactlyElementsIn(original.playerIds).inOrder()
+    }
+
+    private fun GameState.withChaos(vararg players: String): GameState =
+        players.fold(this) { state, player ->
+            state.updatePlayer(PlayerId(player)) {
+                it.copy(misery = MiseryStep.CHAOS, tokenPurchase = 0)
+            }
+        }
+
+    @Test
     fun selectionRejectsPurchasesForADifferentPlayerSet() {
         val failure =
             assertFailsWith<IllegalArgumentException> {

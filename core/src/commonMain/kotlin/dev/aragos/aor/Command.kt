@@ -167,7 +167,14 @@ sealed interface Command {
                         "Every player must have a token purchase at reveal."
                     }
                 }
-            val selection = TurnOrderSelection.fromPurchases(purchases, state.capitalOrder)
+            val automaticChaosOrder =
+                state.header.automaticChaosOrderFromTurn?.let { state.currentTurn() >= it } == true
+            val chaosPlayers =
+                if (automaticChaosOrder) {
+                    submitted.players.filterValues { it.misery == MiseryStep.CHAOS }.keys
+                } else emptySet()
+            val selection =
+                TurnOrderSelection.fromPurchases(purchases, state.capitalOrder, chaosPlayers)
             return submitted.copy(
                 players =
                     submitted.players.mapValues { (_, buying) ->

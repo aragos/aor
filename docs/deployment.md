@@ -80,6 +80,10 @@ Use a maintenance cutover when an older instance could still write: v4-only read
 upgraded header. Rollbacks require a v5-compatible reader or restoration of the complete preceding
 archive.
 
+Automatic Chaos ordering archives existing saves and starts at the first turn without a recorded
+token reveal. Recorded reveals, including any pending tie decisions, retain their original rules.
+The upgrade checkpoint requires a compatible reader.
+
 ## Import file storage
 
 Stop the format-7 file server, privately copy its complete directory, configure SQL secrets and run:

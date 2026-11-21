@@ -137,7 +137,8 @@ separate bot consent. Each human still consents.
 The creator can opt into phase pauses during setup or in Game options. The server pauses the
 runner when an automated seat finishes its own phase activity containing a decision in public
 Activity. A shared sealed batch counts once, on reveal. Urban Ascendancy card purchases, passes
-omitted from Activity, and automatic outcomes do not trigger a pause. Resume is in Activity.
+omitted from Activity, turn-order tie choices, and automatic outcomes do not trigger a pause.
+Activity offers Resume for phase reviews and explicit pauses, including after rewinds.
 A successful human game command or turning the setting off also releases a review pause. Manual
 and history-edit pauses require explicit resume. The setting and pause survive reload. Older saves
 can omit the reviewed seat, and games without this setting default to continuous play. When a qualifying

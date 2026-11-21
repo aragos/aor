@@ -10,7 +10,7 @@ import {TableTools} from './TableTools';
 import {Activity, ActionResultNotice} from './Activity';
 import {TableIcon} from './TableIcon';
 import {PhaseTimeline} from './PhaseTimeline';
-import {BotControls, BotPhasePause} from './ai/BotControls';
+import {BotControls, BotPause} from './ai/BotControls';
 import type {BotControlState} from './ai/BotControls';
 import {FinalScores} from './FullGamePanels';
 import {AdvanceTiles, PlayerOverview, Markets} from './TablePanels';
@@ -58,7 +58,9 @@ export function GameTable({snapshot: liveSnapshot, busy: requestBusy, submit: se
         !!liveSnapshot.planning?.saved?.armed && liveSnapshot.prompt?.messageId !== 'prompt.renaissance';
     const actuallyActing = liveSnapshot.viewerId !== null && (liveSnapshot.prompt?.players.includes(liveSnapshot.viewerId) ?? false);
     const spectator = snapshot.viewerId === null;
-    const showPhasePause = !actuallyActing && !!liveSnapshot.automation?.pausedAfterPhase;
+    const automation = liveSnapshot.automation;
+    const showBotPause = !!automation?.paused &&
+        (automation.pausedAfterPhase ? !actuallyActing : automation.canControl);
     const [expansionPass, setExpansionPass] = useState<number | null>(null);
     const [mapControlsHost, setMapControlsHost] = useState<HTMLDivElement | null>(null);
     const [mapExpanded, setMapExpanded] = useState(false);
@@ -245,7 +247,7 @@ export function GameTable({snapshot: liveSnapshot, busy: requestBusy, submit: se
                 {finished && <button type="button" className="secondary final-scores-toggle" onClick={() => setScoresOpen(true)}>{t('game.finalScores')}</button>}
                 <AccountControls showGames={false}/>
             </header>
-            {liveSnapshot.status === 'ACTIVE' && !finished && showPhasePause &&
+            {liveSnapshot.status === 'ACTIVE' && !finished && showBotPause &&
                 workspace !== 'activity' && (!activityPinned || expandedMap) &&
                 <button type="button" className="secondary bot-activity-shortcut" aria-controls="workspace-activity"
                     onClick={openActivity}>{t('bots.viewActivity')}</button>}
@@ -297,7 +299,7 @@ export function GameTable({snapshot: liveSnapshot, busy: requestBusy, submit: se
             </div>
             <Activity snapshot={liveSnapshot} onInspectCard={id => setInspection({kind: 'history-card', id})}
                 active={workspace === 'activity'} pinned={activityPinned && !expandedMap} canPin={wideScreen} onTogglePin={toggleActivityPin}
-                phasePause={showPhasePause && <BotPhasePause snapshot={liveSnapshot} controls={botAutomation}/>}/>
+                botPause={showBotPause && <BotPause snapshot={liveSnapshot} controls={botAutomation}/>}/>
             <div className="workspace-side" hidden={expandedMap}>
                 <aside className={`decision-panel decision ${hasContext ? 'has-context' : ''} ${actionsCollapsed ? 'sheet-collapsed' : ''}`} aria-label={t(spectator ? 'table.spectatorView' : 'table.currentDecision')}
                     data-action-ready={actuallyActing && !inactive && !finished}>

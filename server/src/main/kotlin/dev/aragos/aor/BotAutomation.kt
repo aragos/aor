@@ -183,6 +183,7 @@ internal object BotAutomation {
         val runner = game.botRunner ?: return game
         if (!runner.pauseAfterPhase || runner.paused || after.stage == Stage.FINISHED) return game
         val phase = before.stage
+        if (phase == Stage.TURN_ORDER_TIE) return game
         val phaseChanged = phase != after.stage || before.turnNumber != after.turnNumber
         if (phase == Stage.BIDDING || phase == Stage.TOKEN_PURCHASE) {
             return if (

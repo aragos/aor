@@ -30,6 +30,14 @@ internal object GameDocuments {
         }
     }
 
+    private fun hasRulesUpgrade(header: GameHeader, command: String): Boolean =
+        when (command) {
+            "upgrade-draw-renaissance" -> header.rulesVersion == RULES_VERSION
+            "upgrade-caravan-transit" -> header.darkCaravanFromTurn != null
+            "upgrade-chaos-order" -> header.automaticChaosOrderFromTurn != null
+            else -> false
+        }
+
     fun requireId(id: String) {
         if (!GAME_ID_PATTERN.matches(id)) throw ServiceFailure(404, "GAME_NOT_FOUND")
     }
@@ -62,6 +70,8 @@ internal object GameDocuments {
                     node["drawRenaissanceFromTurn"]?.takeUnless(JsonNode::isNull)?.integer() ?: 1,
                 darkCaravanFromTurn =
                     node["darkCaravanFromTurn"]?.takeUnless(JsonNode::isNull)?.integer(),
+                automaticChaosOrderFromTurn =
+                    node["automaticChaosOrderFromTurn"]?.takeUnless(JsonNode::isNull)?.integer(),
             )
         val credentialNode = root.field("credentials")
         require(credentialNode.isObject) {
@@ -487,13 +497,9 @@ internal object GameDocuments {
                     state
                 }
                 revision.storageArchive != null &&
-                    revision.command in
-                        setOf("upgrade-draw-renaissance", "upgrade-caravan-transit") -> {
-                    val drawUpgrade = revision.command == "upgrade-draw-renaissance"
+                    hasRulesUpgrade(game.header, revision.command) -> {
                     require(
                         index > 0 &&
-                            (if (drawUpgrade) game.header.rulesVersion == RULES_VERSION
-                            else game.header.darkCaravanFromTurn != null) &&
                             revision.author == game.header.creatorId &&
                             revision.adminAuthor ==
                                 revision.command.replaceFirst("upgrade-", "system-") &&

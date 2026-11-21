@@ -40,6 +40,8 @@ data class GameHeader(
      * rule for every turn, including when replaying older exported logs.
      */
     val darkCaravanFromTurn: Int? = 1,
+    /** First turn with automatic Chaos ordering. Null retains the ordering of older exports. */
+    val automaticChaosOrderFromTurn: Int? = 1,
 ) {
     init {
         require(players.size in 3..6) { "A game requires 3 through 6 players." }
@@ -57,6 +59,9 @@ data class GameHeader(
         }
         require(darkCaravanFromTurn == null || darkCaravanFromTurn > 0) {
             "The Caravan activation turn must be positive when set."
+        }
+        require(automaticChaosOrderFromTurn == null || automaticChaosOrderFromTurn > 0) {
+            "The automatic Chaos ordering activation turn must be positive when set."
         }
         CatalogVersion.fromWire(dataVersion)
     }

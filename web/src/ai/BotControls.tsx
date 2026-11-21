@@ -23,7 +23,7 @@ export function BotControls({snapshot, status, operating, control, savingPhasePa
                 {t('bots.pauseAfterPhase')}
             </label>
             {phasePauseError && <p className="error" role="alert">{t('bots.phasePauseError')}</p>}
-            {!automation.pausedAfterPhase && <div className="button-row">
+            {!automation.paused && <div className="button-row">
                 <button type="button" className="secondary" disabled={operating || savingPhasePause}
                     onClick={() => {void control(resume ? 'resume' : 'pause');}}>
                     {t(resume ? status === 'other' ? 'bots.runHere' : 'bots.resume' : 'bots.pause')}
@@ -33,15 +33,15 @@ export function BotControls({snapshot, status, operating, control, savingPhasePa
     </div>;
 }
 
-export function BotPhasePause({snapshot, controls}: {
+export function BotPause({snapshot, controls}: {
     snapshot: Snapshot; controls?: BotControlState;
 }) {
     const automation = snapshot.automation;
-    const phase = automation?.pausedAfterPhase;
-    if (!phase || snapshot.status !== 'ACTIVE' || snapshot.game.stage === 'FINISHED') return null;
+    if (!automation?.paused || snapshot.status !== 'ACTIVE' || snapshot.game.stage === 'FINISHED') return null;
+    const phase = automation.pausedAfterPhase;
     const player = automation.pausedAfterPlayer;
     return <div className="bot-phase-pause">
-        <span role="status">{player
+        <span role="status">{!phase ? t('bots.status.paused') : player
             ? <LabelMessage text={t('bots.pausedAfterPlayer', {phase: t(`stage.${phase}`)})}
                 values={{player: <PlayerLabel snapshot={snapshot} id={player}/>}}/>
             : t('bots.pausedAfterPhase', {phase: t(`stage.${phase}`)})}</span>

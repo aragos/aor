@@ -30,6 +30,8 @@ internal fun replayUpgradedLog(
                 header["drawRenaissanceFromTurn"]?.takeUnless(JsonNode::isNull)?.integer() ?: 1,
             darkCaravanFromTurn =
                 header["darkCaravanFromTurn"]?.takeUnless(JsonNode::isNull)?.integer(),
+            automaticChaosOrderFromTurn =
+                header["automaticChaosOrderFromTurn"]?.takeUnless(JsonNode::isNull)?.integer(),
         )
     try {
         if (entries.map(TextCodec::parse).map(Entry::toText) != entries) {
