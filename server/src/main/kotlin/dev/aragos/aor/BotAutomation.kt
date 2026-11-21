@@ -4,6 +4,7 @@ import dev.aragos.aor.ai.BotDifficulty
 import dev.aragos.aor.ai.BotObservation
 import dev.aragos.aor.ai.BotObservations
 import dev.aragos.aor.ai.HARD_AUTOMATA_VERSION
+import dev.aragos.aor.ai.PREVIOUS_HARD_AUTOMATA_VERSION
 import dev.aragos.aor.ai.PhaseInitiativeInput
 import dev.aragos.aor.ai.PhaseInitiativePolicy
 import java.security.MessageDigest
@@ -378,7 +379,9 @@ internal object BotAutomation {
                         val decision = decisionId(game, seat)
                         val state = game.state()
                         val observation = BotObservations.from(state, seat)
-                        val current = bot.policyVersion == HARD_AUTOMATA_VERSION
+                        val current =
+                            bot.policyVersion == HARD_AUTOMATA_VERSION ||
+                                bot.policyVersion == PREVIOUS_HARD_AUTOMATA_VERSION
                         val initiative =
                             if (current && observation.decision == "buy-tokens") {
                                 PhaseInitiativePolicy.project(state.viewForDecision(seat), seat)

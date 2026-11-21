@@ -63,14 +63,17 @@ retaining amounts. [Commands](commands.md) owns API fields and diagnostics.
 | Competitive | Committed actions are final. |
 | Regular turn (default) | Own open phase activity, until another player acts or an outcome is recorded. |
 | Friendly turn | Active player's phase activity including nested responses; preserve random events/outcomes. |
-| Linear game | Creator: any complete post-setup prefix, even after completion. Others: their open phase activity. |
+| Friendly game | Creator: any complete post-setup prefix, even after completion. Others: their open phase activity. |
 
 An activity covers one phase, including interruptions under the outer owner. Setup through capital
 selection is protected. Suffix edits can retain others' actions with `@entry`, never invent their
 answers. Validate the entire suffix and original logical random requests/outcomes; reject added,
 removed, ambiguous or incompatible requests atomically. Historical reads retain the viewer's audience.
 
-### Linear game
+### Friendly game
+
+The current policy uses the identifier `linear-game`. The older `friendly-game` identifier
+retains its legacy meaning for historical replay.
 
 Rewind retains an exact shorter prefix with no redo/suffix replacement. A unit includes the action,
 required outcomes and automatic transitions; simultaneous reveal is indivisible. Targets derive
@@ -86,7 +89,7 @@ disarm plans/rotate versions (only the undoing player’s plans when turn and ph
 expire out-of-scope work and invalidate previews. In-scope saved actions may remain unarmed drafts; execution receipts remain facts. Workers must not recreate undone play;
 stale/uncertain requests reconcile before new explicit confirmation.
 
-`LinearGameMigration.kt` converts legacy Friendly game policies with an archived, audited zero-entry
+`LinearGameMigration.kt` converts the legacy `friendly-game` policy with an archived, audited zero-entry
 revision, preserving chain, identities, outcomes, prompts, secrets, receipts and valid plan authority.
 Validate old edits under their revision-time policy. Conversion alone does not clear/disarm work.
 Migration is atomic, resumable and idempotent for restored/imported games too. All readers must support
@@ -132,7 +135,10 @@ epoch until explicit resume. Completion and closure stop bots. Creator abandonme
 separate bot consent. Each human still consents.
 
 [The worker](../web/src/ai/botWorker.ts) selects one hashed, immutable checkpoint model by
-policy version and player count. The three published assets total 304 KiB, with 90–123 KiB
+policy version and player count. The November 21 Hard policy uses the same assets as November 20.
+Its controller prices expected market income and adjusts initiative by table size and opening.
+Existing Hard seats keep their recorded controller on reload and continue receiving initiative and
+finish quotes. The three published assets total 304 KiB, with 90–123 KiB
 uncompressed downloaded once per applicable worker (HTTP caching reuses the versioned URL).
 Startup, setup, human-only games and read-only visits do not initialize the worker or fetch the
 models. Replays use recorded commands and outcomes. Keep older policy files available while

@@ -106,12 +106,14 @@ scheduled card choices say **on my turn** and stay beside their timing explanati
 Planned relief declines remain visible, and active drafts offer an explicit
 Save and execute action.
 
-Undo first withdraws unrevealed submissions; otherwise Linear game reviews server-offered targets and
-removed public actions/random events, cleared submissions and paused plans. Earlier targets live under
-Commands. **Rewind to here** confirms; stale offers need fresh review/confirmation. Prior revisions are
-read-only. Help explains fresh rolls, restored draws, no redo/retained knowledge. Policy conversion
-refreshes capabilities/closes legacy editor but preserves valid drafts. Rewinds across turn/phase
-boundaries clear drafts; same-phase undo preserves other players’ planning drafts.
+Undo first withdraws unrevealed submissions. Friendly game undoes your latest action immediately
+when it stays in the current turn and phase and leaves random outcomes and submissions intact.
+Confirm sensitive one-step undos. The arrow beside Undo opens the server-offered checkpoints. **Rewind to here**
+confirms the selected checkpoint. Stale offers require a fresh selection and confirmation. Prior
+revisions are read-only. Help covers restored draws, fresh rolls, retained knowledge, and the absence
+of redo. Policy conversion refreshes capabilities and closes the legacy editor while preserving valid
+drafts. Rewinds across turn or phase boundaries clear drafts. Same-phase undo preserves other players’
+planning drafts.
 [Architecture](design.md#history-and-undo) owns scopes.
 
 Abandonment lives in collapsed Game options with one consent section. Proposing agrees; all seats must

@@ -322,7 +322,6 @@ p { line-height: 1.55; } a { color: var(--link); text-underline-offset: 3px; } l
 
 .choice-buttons { display: flex; flex-wrap: wrap; gap: .4rem; margin-block: .5rem; }
 .choice-buttons button[aria-pressed="true"] { background: var(--resource-bg, #e4eddc); border-color: #477349; }
-.marker-reduction { margin-block: .75rem; }
 /* Account pages share the table's colours and remain usable on small screens. */
 .account-controls {display:flex; align-items:center; gap:.7rem; flex-wrap:wrap; font-size:.85rem;}
 .account-controls span {overflow-wrap:anywhere;}
@@ -571,8 +570,12 @@ fieldset.choice-buttons {border: 0; margin: 0; padding: 0; min-width: 0;}
 .decision-action-label { display: block; margin-bottom: .1rem; color: var(--muted); font-size: .78rem; font-weight: 700; }
 .decision-panel[data-action-ready="true"] .decision-title-group { border-inline-start: 3px solid var(--focus); padding-inline-start: .55rem; }
 .decision-scroll > .decision-heading { margin-bottom: .5rem; min-width: 0; }
-.decision-toolbar > .undo-action, .decision-toolbar > .sheet-toggle { height: 38px; min-height: 38px; padding: .3rem .6rem; font-size: .9rem; }
-.decision-toolbar > .undo-action { flex: none; width: 5rem; font-weight: 700; }
+.undo-controls { display: flex; flex: none; }
+.undo-controls > button, .decision-toolbar > .sheet-toggle { height: 38px; min-height: 38px; padding: .3rem .6rem; font-size: .9rem; }
+.undo-controls > .undo-action { width: 5rem; font-weight: 700; }
+.undo-controls.has-history > .undo-action { border-start-end-radius: 0; border-end-end-radius: 0; }
+.undo-controls > .undo-history { min-width: 44px; border-start-start-radius: 0; border-end-start-radius: 0; border-inline-start: 0; }
+.undo-controls > button:focus-visible { z-index: 1; }
 .decision-toolbar > .sheet-toggle, .decision-toolbar > .close-detail { position: static; flex: none; margin: 0; }
 .advance-tile { align-items: center; }
 
@@ -608,9 +611,14 @@ fieldset.choice-buttons {border: 0; margin: 0; padding: 0; min-width: 0;}
 .final-scores-dialog { width: min(46rem, calc(100vw - 2rem)); }
 .final-scores-dialog .final-scores { border: 0; margin: 0; box-shadow: none; }
 .final-scores-dialog > .close-detail { top: .5rem; right: .5rem; }
-.reduction-review-heading { display: flex; align-items: center; justify-content: space-between; gap: .5rem; }
-.reduction-review-heading .clear-action { margin: 0; min-height: 32px; padding: .3rem .45rem; font-size: .8rem; }
-.reduction-preview p { margin-block: .35rem; }
+.marker-reduction { background: var(--blocker-fill); border-inline-start: 3px solid var(--blocker-border); border-radius: 5px; padding: .65rem .75rem; margin-block: .25rem .65rem; }
+.marker-reduction-heading { display: flex; align-items: center; justify-content: space-between; gap: .5rem; margin-bottom: .35rem; }
+.marker-reduction-heading label { margin: 0; }
+.marker-reduction > strong { color: var(--blocker); }
+.marker-reduction p { margin: .3rem 0 .55rem; }
+.marker-reduction-toggle { min-height: 44px; padding: .45rem .75rem; font-weight: 700; }
+.marker-reduction select { width: 100%; min-height: 44px; }
+.reduction-preview { margin-top: .65rem; }
 
 .players-workspace { display: contents; }
 .players-workspace > .player-overview { grid-area: players; min-width: 0; max-height: 28dvh; overflow: auto; }
@@ -705,8 +713,13 @@ fieldset.choice-buttons {border: 0; margin: 0; padding: 0; min-width: 0;}
 .abandonment-status h3 { font-size: 1rem; margin-bottom: .4rem; }
 .abandonment-status p { margin-bottom: .45rem; }
 .abandonment-status .button-row { gap: .4rem; }
-.rewind-targets { max-height: 20rem; overflow: auto; padding-left: 1.5rem; }
-.rewind-targets li { margin-bottom: .4rem; }
+.rewind-dialog > .close-detail { top: .5rem; right: .5rem; }
+.rewind-dialog h2:focus { outline: none; }
+.rewind-dialog strong, .rewind-dialog strong + span { display: block; }
+.rewind-targets { max-height: min(24rem, 56dvh); overflow: auto; list-style: none; padding: .25rem; margin: 0 0 .6rem; }
+.rewind-targets li + li { margin-top: .4rem; }
+.rewind-targets button { display: block; width: 100%; min-height: 44px; text-align: start; overflow-wrap: anywhere; }
+.rewind-dialog .button-row { gap: .5rem; }
 
 /* Keep full labels and touch targets while leaving short phones room for the action review. */
 @media (max-width: 700px) and (max-height: 700px) {

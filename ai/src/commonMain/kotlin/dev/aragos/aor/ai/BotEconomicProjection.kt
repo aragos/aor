@@ -27,6 +27,8 @@ enum class BotEconomicFeature(val key: String) {
     PUBLIC_COMMODITY("planning.publicCommodity"),
     /** Public commodity opportunity removed from a defending marker's owner, in dollars. */
     COMMODITY_DENIAL("planning.commodityDenial"),
+    /** Expected ordinary income in dollars from completing the offered marker. */
+    MARKET_MARKER_INCOME("planning.marketMarkerIncome"),
     /** Negative dollar growth forfeited by consuming a card before nearby ordinary expansion. */
     RETAINED_COMMODITY("planning.retainedCommodity"),
     /** Minus one when consuming a card leaves unused future matching-market opportunities. */
@@ -204,6 +206,10 @@ internal class BotEconomicProjection(private val view: GameView, private val sea
                 }
             }
         return features(
+            BotEconomicFeature.MARKET_MARKER_INCOME to
+                if (tokens >= offer.requiredTokens) {
+                    (catalog.incomeTrack[1] - catalog.incomeTrack[0]) * chance
+                } else 0.0,
             BotEconomicFeature.HELD_COMMODITY to held * scale,
             BotEconomicFeature.PUBLIC_COMMODITY to public * scale,
             BotEconomicFeature.COMMODITY_DENIAL to denied * scale,

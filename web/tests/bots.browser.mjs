@@ -58,7 +58,7 @@ try {
     assert.match(await page.evaluate(`document.querySelector('.automated-opponents').textContent`), /experimental.*Latest update: aor-hard-/);
     assert.equal(await page.evaluate('window.botWorkerInputs.length'), 0, 'Game setup does not load a model');
     await page.evaluate(`document.querySelector('.creation-settings').open = true`);
-    await page.click('Linear game');
+    await page.click('Friendly game');
     assert.equal(await page.evaluate(`document.querySelector('.automated-opponents').textContent.includes('3 of 6 seats')`), true);
     await page.click('Create game');
     await page.wait(`document.querySelectorAll('.seat-links a').length === 1`, 'only the human receives a private seat link');
