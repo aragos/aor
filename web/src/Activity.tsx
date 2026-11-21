@@ -255,9 +255,10 @@ export function ActionResultNotice({event, snapshot, onDismiss}: {
     </ResultNotice>;
 }
 
-export function Activity({snapshot, onInspectCard, active, pinned, canPin, onTogglePin}: {
+export function Activity({snapshot, onInspectCard, active, pinned, canPin, onTogglePin, phasePause}: {
     snapshot: Snapshot; onInspectCard: (cardId: string) => void;
     active: boolean; pinned: boolean; canPin: boolean; onTogglePin: () => void;
+    phasePause?: ReactNode;
 }) {
     const rows = activityRows(snapshot.events).filter(row => row[0].kind !== 'PASS');
     const pinLabel = t(pinned ? 'table.unpinActivity' : 'table.pinActivity');
@@ -273,6 +274,7 @@ export function Activity({snapshot, onInspectCard, active, pinned, canPin, onTog
             </svg>
             <span>{pinLabel}</span>
         </button>}
+        {phasePause}
         <div className="activity-body">
             {rows.length === 0 && <p>{t('table.noActivity')}</p>}
             <ol className="activity-list" tabIndex={0} aria-label={t('table.recentActivity')}>{[...rows].reverse().map(row => {

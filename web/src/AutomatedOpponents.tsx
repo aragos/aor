@@ -1,8 +1,9 @@
 import {t} from './messages';
 
-export function AutomatedOpponents({count, onChange, humanCount, version, disabled = false}: {
+export function AutomatedOpponents({count, onChange, humanCount, version, disabled = false, pauseAfterPhase, onPauseAfterPhaseChange}: {
     count: number; onChange: (count: number) => void;
     humanCount: number; version?: string; disabled?: boolean;
+    pauseAfterPhase: boolean; onPauseAfterPhaseChange: (enabled: boolean) => void;
 }) {
     return <fieldset className="automated-opponents" disabled={disabled}>
         <legend>{t('bots.opponents')}</legend>
@@ -14,7 +15,14 @@ export function AutomatedOpponents({count, onChange, humanCount, version, disabl
         </div>)}
         <button type="button" className="secondary" disabled={humanCount + count >= 6}
             onClick={() => onChange(count + 1)}>{t('bots.add')}</button>
-        {count > 0 && <p className="muted small">{t('bots.hosting')}</p>}
+        {count > 0 && <>
+            <label className="bot-phase-option">
+                <input type="checkbox" checked={pauseAfterPhase}
+                    onChange={event => onPauseAfterPhaseChange(event.target.checked)}/>
+                {t('bots.pauseAfterPhase')}
+            </label>
+            <p className="muted small">{t('bots.hosting')}</p>
+        </>}
         <p className="muted small">{t('bots.seatCount', {count: humanCount + count})}</p>
     </fieldset>;
 }

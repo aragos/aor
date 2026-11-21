@@ -120,6 +120,7 @@ internal object GameDocuments {
                         author = PlayerId(revision.field("author").string()),
                         command = revision.field("command").string(),
                         entries = revision.field("entries").array().map(JsonNode::string),
+                        defersPhaseOutcomes = revision["defersPhaseOutcomes"]?.boolean() ?: false,
                         replaceFrom =
                             revision.field("replaceFrom").let {
                                 if (it.isNull) null else it.integer()
@@ -174,6 +175,11 @@ internal object GameDocuments {
                                 ?.takeUnless(JsonNode::isNull)
                                 ?.string()
                                 ?.let(Stage::valueOf),
+                        pausedAfterPlayer =
+                            runner["pausedAfterPlayer"]
+                                ?.takeUnless(JsonNode::isNull)
+                                ?.string()
+                                ?.let(::PlayerId),
                         runnerId = runner["runnerId"]?.takeUnless(JsonNode::isNull)?.string(),
                         leaseUntil = runner.field("leaseUntil").longInteger(),
                         receipts =
@@ -310,6 +316,9 @@ internal object GameDocuments {
             "Credentials must be SHA-256 hashes encoded as 64 lowercase hexadecimal characters."
         }
         game.botRunner?.let { runner ->
+            require(runner.pausedAfterPlayer == null || runner.pausedAfterPlayer in game.bots) {
+                "A reviewed automated seat must be part of the game."
+            }
             require(runner.receipts.all { it.revision <= game.revision }) {
                 "Automated command receipts cannot name future revisions."
             }
@@ -321,6 +330,9 @@ internal object GameDocuments {
             "A game must have an initial configuration revision."
         }
         val state = validateRevisions(game)
+        require(!game.phaseOutcomesDeferred || game.botRunner?.paused == true) {
+            "A game with deferred authority outcomes requires paused automation."
+        }
         require(
             players.containsAll(game.plans.keys) &&
                 players.containsAll(game.planVersions.keys) &&
@@ -640,13 +652,14 @@ internal object GameDocuments {
                     }
                     state
                 }
-                else -> validateRevision(state, index, revision, prefixes)
+                else -> validateRevision(state, previous, index, revision, prefixes)
             }
         }
     }
 
     private fun validateRevision(
         state: GameState,
+        previous: StoredGame,
         index: Int,
         revision: Revision,
         prefixes: ReplayPrefixes,
@@ -662,12 +675,34 @@ internal object GameDocuments {
         require(entries.isNotEmpty() && entries.take(actions.size) == actions) {
             "Each revision must contain player actions followed by system outcomes."
         }
-        validateActions(state, revision, actions, entries, index)
+        if (revision.command == CONTINUE_PHASE) {
+            require(
+                previous.phaseOutcomesDeferred &&
+                    state.prompts().singleOrNull() is Prompt.System &&
+                    revision.author == state.header.creatorId &&
+                    actions.isEmpty() &&
+                    !revision.defersPhaseOutcomes
+            ) {
+                "Only authority may continue a deferred phase."
+            }
+        } else {
+            validateActions(state, revision, actions, entries, index)
+        }
         require(revision.entries == entries.map(TextCodec::print)) {
             "Stored entries must use canonical text."
         }
         val next = entries.fold(state, prefixes::step)
-        requireCompletedTransaction(next)
+        if (revision.defersPhaseOutcomes) {
+            require(
+                actions.isNotEmpty() &&
+                    previous.bots.isNotEmpty() &&
+                    hasNextPhaseOutcomes(state, next)
+            ) {
+                "Phase review can only defer authority outcomes at a turn phase boundary."
+            }
+        } else {
+            requireCompletedTransaction(next)
+        }
         return next
     }
 

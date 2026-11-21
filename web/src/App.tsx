@@ -27,6 +27,7 @@ function CreateGame({automataVersion}: {automataVersion?: string}) {
     const [name, setName] = useState('');
     const [names, setNames] = useState('Alice\nBob\nCarol');
     const [botCount, setBotCount] = useState(0);
+    const [pauseAfterPhase, setPauseAfterPhase] = useState(false);
     const humanNames = names.split('\n').map(value => value.trim()).filter(Boolean);
     const [undoPolicy, setUndoPolicy] = useStoredSetting('undo-policy', 'regular-turn', isUndoPolicy);
     const [variants, setVariants] = useStoredSetting('variants', defaultVariants, validVariants, migrateVariants);
@@ -35,7 +36,7 @@ function CreateGame({automataVersion}: {automataVersion?: string}) {
     const [error, setError] = useState('');
     async function create(event: FormEvent) {
         event.preventDefault(); setBusy(true); setError('');
-        try { setCreated(await request<CreatedGame>('/api/games', undefined, {name: name.trim(), players: humanNames, bots: Array.from({length: botCount}, () => ({})), options: variants, undoPolicy})); }
+        try { setCreated(await request<CreatedGame>('/api/games', undefined, {name: name.trim(), players: humanNames, bots: Array.from({length: botCount}, () => ({})), pauseAfterPhase: botCount > 0 && pauseAfterPhase, options: variants, undoPolicy})); }
         catch (failure) { setError(errorCode(failure)); }
         finally { setBusy(false); }
     }
@@ -55,7 +56,8 @@ function CreateGame({automataVersion}: {automataVersion?: string}) {
             <input id="game-name" value={name} onChange={event => setName(event.target.value)} maxLength={80} required disabled={busy}/>
             <label htmlFor="names">{t('create.players')}</label>
             <textarea id="names" rows={6} value={names} onChange={event => setNames(event.target.value)} required/>
-            <AutomatedOpponents count={botCount} onChange={setBotCount} version={automataVersion} humanCount={humanNames.length} disabled={busy}/>
+            <AutomatedOpponents count={botCount} onChange={setBotCount}
+                pauseAfterPhase={pauseAfterPhase} onPauseAfterPhaseChange={setPauseAfterPhase} version={automataVersion} humanCount={humanNames.length} disabled={busy}/>
             <p className="muted small">{t('create.threeEpochs')}</p>
             <details className="creation-settings"><summary>{t('table.configuration')}</summary>
             <Variants value={variants} onChange={setVariants} disabled={busy}/>

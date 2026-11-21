@@ -151,6 +151,7 @@ class HostedServices(
         policy: UndoPolicy,
         name: GameName = GameName.DEFAULT,
         bots: List<AutomatedPlayerRequest> = emptyList(),
+        pauseAfterPhase: Boolean = false,
     ): CreatedGame {
         val creator = account(identity)
         if (!mayCreate(creator)) throw ServiceFailure(403, "GAME_CREATION_FORBIDDEN")
@@ -160,6 +161,14 @@ class HostedServices(
         val players = ids.map { id ->
             accounts.find(AccountId(id)) ?: throw ServiceFailure(400, "UNREGISTERED_PLAYER")
         }
-        return games.createRegistered(players, creator.id, rules, policy, name, bots)
+        return games.createRegistered(
+            players,
+            creator.id,
+            rules,
+            policy,
+            name,
+            bots,
+            pauseAfterPhase,
+        )
     }
 }

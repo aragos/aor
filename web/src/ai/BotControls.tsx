@@ -1,5 +1,6 @@
 import type {Snapshot} from '../api';
 import {t} from '../messages';
+import {LabelMessage, PlayerLabel} from '../IdentityLabel';
 import type {useBotAutomation} from './useBotAutomation';
 
 export type BotControlState = ReturnType<typeof useBotAutomation>;
@@ -32,16 +33,18 @@ export function BotControls({snapshot, status, operating, control, savingPhasePa
     </div>;
 }
 
-export function BotPhasePause({snapshot, controls, openActivity}: {
-    snapshot: Snapshot; controls?: BotControlState; openActivity?: () => void;
+export function BotPhasePause({snapshot, controls}: {
+    snapshot: Snapshot; controls?: BotControlState;
 }) {
     const automation = snapshot.automation;
     const phase = automation?.pausedAfterPhase;
     if (!phase || snapshot.status !== 'ACTIVE' || snapshot.game.stage === 'FINISHED') return null;
+    const player = automation.pausedAfterPlayer;
     return <div className="bot-phase-pause">
-        <span role="status">{t('bots.pausedAfterPhase', {phase: t(`stage.${phase}`)})}</span>
-        {openActivity && <button type="button" className="secondary" aria-controls="workspace-activity"
-            onClick={openActivity}>{t('bots.viewActivity')}</button>}
+        <span role="status">{player
+            ? <LabelMessage text={t('bots.pausedAfterPlayer', {phase: t(`stage.${phase}`)})}
+                values={{player: <PlayerLabel snapshot={snapshot} id={player}/>}}/>
+            : t('bots.pausedAfterPhase', {phase: t(`stage.${phase}`)})}</span>
         {automation.canControl && controls && <button type="button" disabled={controls.operating || controls.savingPhasePause}
             onClick={() => {void controls.control('resume');}}>{t('bots.resume')}</button>}
     </div>;
