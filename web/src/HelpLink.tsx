@@ -1,6 +1,7 @@
 import {createContext, lazy, Suspense, useContext, useState} from 'react';
 import type {ReactNode} from 'react';
 import {createPortal} from 'react-dom';
+import {label as entityLabel} from './labels';
 import {t} from './messages';
 import type {PlayerView, PublicCatalog, Snapshot} from './api';
 import {CardInspectionDialog} from './CardInspectionDialog';
@@ -26,6 +27,15 @@ export function ButtonHelp({children, topic, label}: {
     children: ReactNode; topic: string; label: string;
 }) {
     return <span className="button-with-help">{children}<HelpLink topic={topic} label={label}/></span>;
+}
+
+/** Open one payout reference with a chooser for every commodity on the card. */
+export function CommodityPayoutHelp({commodities}: {commodities: readonly string[]}) {
+    const [first] = commodities;
+    if (!first) return null;
+    const names = commodities.map(commodity => entityLabel(commodity, 'commodity')).join(' / ');
+    return <HelpLink topic={`commodity-${first.toLowerCase()}`} commodityChoices={commodities}
+        label={`${names} · ${t('table.fullPayouts')}`}/>;
 }
 
 /** Inspect reference material in place while retaining the prepared game action. */

@@ -1,13 +1,13 @@
 import {useLayoutEffect, useRef, useState} from 'react';
 import type {Snapshot} from './api';
-import {advanceName, label} from './labels';
+import {advanceName} from './labels';
 import {t} from './messages';
 import {Commodity, CommodityAdjustments, Payouts} from './TablePanels';
 import {useMapSelection} from './map/MapSelection';
 import {finiteDecisions} from './decisionOffers';
 import {CardRecurrence} from './CardRecurrence';
 import {LeaderCredit, leaderCreditNote} from './LeaderCredit';
-import {HelpLink} from './HelpLink';
+import {CommodityPayoutHelp} from './HelpLink';
 import {useDragScroll} from './useDragScroll';
 
 /** Reveal a card within the hand's own viewport, without moving the board or page. */
@@ -136,7 +136,6 @@ export function Hand({snapshot, busy = false}: {snapshot: Snapshot; busy?: boole
             const offer = snapshot.game.cardOffers.find(candidate => candidate.reference === card.reference);
             const info = snapshot.game.cardInspections?.find(candidate => candidate.definition.id === card.definition.id);
             const commodities = offer?.commodities ?? info?.commodities ?? [];
-            const [firstCommodity] = commodities;
             const discounts = offer?.leaderDiscounts ?? info?.leaderDiscounts ?? [];
             const [firstDiscount] = discounts;
             const sharedWrittenRecordBonus = firstDiscount && discounts.every(discount =>
@@ -203,9 +202,8 @@ export function Hand({snapshot, busy = false}: {snapshot: Snapshot; busy?: boole
                         {status && <span className="hand-card-status">{status}</span>}
                     </span>
                 </button>
-                {firstCommodity && <span className="card-track-links">
-                    <HelpLink topic={`commodity-${firstCommodity.toLowerCase()}`} commodityChoices={commodities}
-                        label={`${commodities.map(commodity => label(commodity, 'commodity')).join(' / ')} · ${t('table.fullPayouts')}`}/>
+                {commodities.length > 0 && <span className="card-track-links">
+                    <CommodityPayoutHelp commodities={commodities}/>
                 </span>}
             </div>;
         })}{snapshot.game.hand.length === 0 && <p className="muted">{t('game.noCards')}</p>}</div></div>
