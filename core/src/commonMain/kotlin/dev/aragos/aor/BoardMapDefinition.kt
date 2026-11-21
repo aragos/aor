@@ -22,6 +22,16 @@ data class BoardMapDefinition(
         provinces.associateBy(ProvinceDefinition::id)
     }
 
+    private val landGraphs by lazy {
+        (3..capitalOrder.size).associateWith { count -> lazy { LandGraph(this, count) } }
+    }
+
+    internal fun landGraph(playerCount: Int): LandGraph =
+        requireNotNull(landGraphs[playerCount]) {
+                "This map supports three through ${capitalOrder.size} players."
+            }
+            .value
+
     private val shippingGraphs: Map<Int, ShippingGraph> by lazy {
         (3..capitalOrder.size).associateWith { playerCount -> ShippingGraph(this, playerCount) }
     }

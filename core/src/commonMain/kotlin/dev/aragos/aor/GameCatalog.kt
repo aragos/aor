@@ -41,17 +41,14 @@ data class CatalogConfiguration(
     val seas: List<SeaArea>
         get() = map.seaAreas.keys.toList()
 
-    val landBorders: Set<ProvinceConnection> by lazy {
-        map.landBorders.filter(::containsBoth).toSet()
-    }
+    internal val landGraph: LandGraph
+        get() = map.landGraph(playerCount)
 
-    /** Adjacency retains printed connection order for deterministic route tie breaking. */
-    internal val landNeighbors: Map<ProvinceId, Set<ProvinceId>> by lazy {
-        landBorders
-            .flatMap { edge -> listOf(edge.first to edge.second, edge.second to edge.first) }
-            .groupBy(Pair<ProvinceId, ProvinceId>::first, Pair<ProvinceId, ProvinceId>::second)
-            .mapValues { (_, neighbors) -> neighbors.toSet() }
-    }
+    val landBorders: Set<ProvinceConnection>
+        get() = landGraph.borders
+
+    internal val landNeighbors: Map<ProvinceId, Set<ProvinceId>>
+        get() = landGraph.neighbors
 
     val coastalConnections: Set<ProvinceConnection> by lazy {
         map.coastalConnections.filter(::containsBoth).toSet()

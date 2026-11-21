@@ -43,14 +43,29 @@ object ExpansionReach {
         if (profile.chaos || destination !in context.provinceIds) return emptyList()
         val target = context.province(destination)
         if (!canEnter(profile, target)) return emptyList()
-        val neighbors = context.configuration.landNeighbors[destination].orEmpty()
+        val graph = context.configuration.landGraph
         val shipsAvailable = target.coastal && profile.ships.fleet != ShippingFleet.NONE
         val routes = buildList {
-            for (base in context.bases(player)) {
-                if (base == destination) add(ExpansionRoute.Local(base))
-                if (base in neighbors) add(ExpansionRoute.Land(base))
-                addAll(caravanRoutes(context, profile, base, destination, neighbors))
-                if (shipsAvailable) addAll(shippingRoutes(context, profile, base, target))
+            val bases = context.bases(player)
+            if (destination in bases) add(ExpansionRoute.Local(destination))
+            for (base in context.configuration.landNeighbors[destination].orEmpty()) {
+                if (base in bases) add(ExpansionRoute.Land(base))
+            }
+            if (AdvanceId.CARAVAN in profile.advances) {
+                for (route in graph.caravanRoutes[destination].orEmpty()) {
+                    if (
+                        route.base in bases &&
+                            canEnter(profile, context.province(route.via)) &&
+                            !opponentFills(context, player, route.via)
+                    ) {
+                        add(route)
+                    }
+                }
+            }
+            if (shipsAvailable) {
+                for (base in bases) {
+                    addAll(shippingRoutes(context, profile, base, target))
+                }
             }
         }
         return if (routes.size < 2) routes else routes.distinct().sortedWith(routeOrder)
@@ -207,20 +222,6 @@ object ExpansionReach {
             requirement.isSatisfiedBy(profile.advances)
         }
 
-    private fun caravanRoutes(
-        context: BoardRulesContext,
-        profile: BoardPlayerProfile,
-        base: ProvinceId,
-        destination: ProvinceId,
-        neighbors: Set<ProvinceId>,
-    ): List<ExpansionRoute.Caravan> {
-        if (AdvanceId.CARAVAN !in profile.advances) return emptyList()
-        return caravanIntermediates(context, profile, base, neighbors)
-            .filterNot { via -> opponentFills(context, profile.player, via) }
-            .map { via -> ExpansionRoute.Caravan(base, via) }
-            .toList()
-    }
-
     /** Explains a failed reach check when a full intermediate province blocks Caravan. */
     internal fun blockedCaravanIntermediate(
         context: BoardRulesContext,
@@ -235,24 +236,17 @@ object ExpansionReach {
         ) {
             return null
         }
-        val neighbors = context.configuration.landNeighbors[destination].orEmpty()
-        return context
-            .bases(player)
+        val bases = context.bases(player)
+        return context.configuration.landGraph.caravanRoutes[destination]
+            .orEmpty()
             .asSequence()
-            .flatMap { base -> caravanIntermediates(context, profile, base, neighbors) }
-            .filter { via -> opponentFills(context, player, via) }
+            .filter { route -> route.base in bases }
+            .map(ExpansionRoute.Caravan::via)
+            .filter { via ->
+                canEnter(profile, context.province(via)) && opponentFills(context, player, via)
+            }
             .minByOrNull(ProvinceId::value)
     }
-
-    private fun caravanIntermediates(
-        context: BoardRulesContext,
-        profile: BoardPlayerProfile,
-        base: ProvinceId,
-        neighbors: Set<ProvinceId>,
-    ): Sequence<ProvinceId> =
-        context.configuration.landNeighbors[base].orEmpty().asSequence().filter { via ->
-            via in neighbors && canEnter(profile, context.province(via))
-        }
 
     private fun shippingRoutes(
         context: BoardRulesContext,

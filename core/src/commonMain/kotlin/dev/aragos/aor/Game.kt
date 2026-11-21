@@ -138,9 +138,7 @@ data class GameState(
     internal val cardContext: CardContext by lazy { buildCardContext() }
     internal val commonView: GameView.Common by lazy { GameView.Common(this) }
 
-    val catalog: CatalogConfiguration by lazy {
-        CatalogConfiguration(playerIds.size, rules, CatalogVersion.fromWire(header.dataVersion))
-    }
+    val catalog: CatalogConfiguration by lazy { rules.catalogFor(header) }
 
     val playerIds: List<PlayerId>
         get() = header.players.map(Player::id)

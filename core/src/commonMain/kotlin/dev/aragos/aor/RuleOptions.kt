@@ -10,6 +10,17 @@ data class RuleOptions(
     val map: MapRule = MapRule.STANDARD,
     val drawThreeKeepTwo: Boolean = false,
 ) {
+    // The map, player limits and catalog version stay fixed across snapshots using these rules.
+    private val catalogs by lazy {
+        CatalogVersion.entries.map { version ->
+            (3..6).map { players -> lazy { CatalogConfiguration(players, this, version) } }
+        }
+    }
+
+    /** Reuse static geography for a validated game header, independently of board occupancy. */
+    internal fun catalogFor(header: GameHeader): CatalogConfiguration =
+        catalogs[CatalogVersion.fromWire(header.dataVersion).ordinal][header.players.size - 3].value
+
     /** Whether the opening deck can supply the configured draw and return sequence. */
     fun supportsInitialDeal(playerCount: Int): Boolean =
         !drawThreeKeepTwo ||
