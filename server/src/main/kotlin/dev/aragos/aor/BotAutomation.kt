@@ -3,11 +3,15 @@ package dev.aragos.aor
 import dev.aragos.aor.ai.BotDifficulty
 import dev.aragos.aor.ai.BotObservation
 import dev.aragos.aor.ai.BotObservations
+import dev.aragos.aor.ai.HARD_AUTOMATA_VERSION
+import dev.aragos.aor.ai.PREVIOUS_HARD_AUTOMATA_VERSION
+import dev.aragos.aor.ai.PhaseInitiativeInput
+import dev.aragos.aor.ai.PhaseInitiativePolicy
 import java.security.MessageDigest
 import java.util.UUID
 
 /** A new automated seat; its display name is fixed when the game is created. */
-data class AutomatedPlayerRequest(val name: String, val difficulty: BotDifficulty) {
+data class AutomatedPlayerRequest(val name: String) {
     init {
         require(name.isNotBlank() && name == name.trim() && name.length <= 60) {
             "An automated player requires a trimmed display name of one through 60 characters."
@@ -48,6 +52,9 @@ data class BotOperationReceipt(
 /**
  * Browser leases last 30 seconds. [epoch] fences every earlier owner after release or takeover.
  * Receipts are bounded reconciliation facts and survive rewind; they never replay bot decisions.
+ * [pauseAfterPhase] is the creator's game-wide pacing setting. [pausedAfterPhase] records the
+ * reviewed phase and [pausedAfterPlayer] identifies the automated seat for a sequential activity. A
+ * shared reveal or a phase pause saved before seat-level pacing has no seat.
  */
 data class BotRunnerState(
     val epoch: Int = 0,
@@ -55,6 +62,9 @@ data class BotRunnerState(
     val runnerId: String? = null,
     val leaseUntil: Long = 0,
     val receipts: List<BotOperationReceipt> = emptyList(),
+    val pauseAfterPhase: Boolean = false,
+    val pausedAfterPhase: Stage? = null,
+    val pausedAfterPlayer: PlayerId? = null,
 ) {
     init {
         require(epoch >= 0 && leaseUntil >= 0) {
@@ -62,6 +72,12 @@ data class BotRunnerState(
         }
         require((runnerId == null) == (leaseUntil == 0L)) {
             "A browser lease requires both its runner identity and deadline."
+        }
+        require(pausedAfterPhase == null || paused) {
+            "A completed phase can only be the reason for a paused browser runner."
+        }
+        require(pausedAfterPlayer == null || pausedAfterPhase != null) {
+            "A reviewed seat requires a completed phase."
         }
         require(!paused || runnerId == null) {
             "Paused automated players cannot retain an active browser lease."
@@ -90,6 +106,9 @@ data class AutomationView(
     val canControl: Boolean,
     val paused: Boolean,
     val epoch: Int,
+    val pauseAfterPhase: Boolean,
+    val pausedAfterPhase: Stage?,
+    val pausedAfterPlayer: PlayerId?,
 )
 
 data class BotDecisionWork(
@@ -99,9 +118,12 @@ data class BotDecisionWork(
     val decisionId: String,
     val submissionVersion: String?,
     val observation: BotObservation,
+    val policyVersion: String,
+    val initiative: PhaseInitiativeInput? = null,
+    val finish: FinalAdvanceOffer? = null,
 )
 
-/** Creator-only work; each observation belongs to exactly one automated seat. */
+/** Creator-only work. Each observation belongs only to its acting automated seat. */
 data class BotWork(
     val revision: Int,
     val epoch: Int,
@@ -111,7 +133,7 @@ data class BotWork(
     val operationReceipts: List<String>,
 )
 
-/** Client-computed commands pass through the ordinary authority driver under the game lock. */
+/** Fenced automated decisions use the ordinary authority driver under the game lock. */
 internal object BotAutomation {
     private const val LEASE_MILLIS = 30000L
 
@@ -132,16 +154,83 @@ internal object BotAutomation {
             canControl = viewer == game.header.creatorId && active(game),
             paused = runner.paused || !active(game),
             epoch = runner.epoch,
+            pauseAfterPhase = runner.pauseAfterPhase,
+            pausedAfterPhase = runner.pausedAfterPhase,
+            pausedAfterPlayer = runner.pausedAfterPlayer,
         )
     }
 
-    fun pause(game: StoredGame): StoredGame {
+    /** A successful human game command releases a review pause without granting a browser lease. */
+    fun beforeHumanAction(game: StoredGame, player: PlayerId): StoredGame =
+        if (player in game.bots) game else resumeReviewPause(game)
+
+    private fun resumeReviewPause(game: StoredGame): StoredGame {
+        val runner = game.botRunner ?: return game
+        if (runner.pausedAfterPhase == null) return game
+        return game.copy(
+            botRunner =
+                runner.copy(
+                    epoch = nextEpoch(runner),
+                    paused = false,
+                    pausedAfterPhase = null,
+                    pausedAfterPlayer = null,
+                )
+        )
+    }
+
+    /** Check the completed seat activity after all authority outcomes for the command resolve. */
+    fun afterCommit(game: StoredGame, before: GameState, after: GameState): StoredGame {
+        val runner = game.botRunner ?: return game
+        if (!runner.pauseAfterPhase || runner.paused || after.stage == Stage.FINISHED) return game
+        val phase = before.stage
+        val phaseChanged = phase != after.stage || before.turnNumber != after.turnNumber
+        if (phase == Stage.BIDDING || phase == Stage.TOKEN_PURCHASE) {
+            return if (
+                phaseChanged &&
+                    HistoryProjection.hasAutomatedDecision(game, before.entryCount, game.bots.keys)
+            ) {
+                pause(game, phase)
+            } else game
+        }
+        val owner = before.flow.actor
+        if (owner != null && before.flow.phaseBookkeepingApplied) {
+            if (!phaseChanged && owner == after.flow.actor) return game
+            return if (
+                owner in game.bots &&
+                    HistoryProjection.hasAutomatedDecision(
+                        game,
+                        before.activityStart,
+                        setOf(owner),
+                        excludeOrderSwaps = true,
+                    )
+            ) {
+                pause(game, phase, owner)
+            } else game
+        }
+        // Setup and phase-opening prompts each belong directly to their responding seat.
+        val responder = (before.prompts().singleOrNull() as? Prompt.SinglePlayer)?.player
+        return if (
+            responder != null &&
+                responder in game.bots &&
+                HistoryProjection.hasAutomatedDecision(game, before.entryCount, setOf(responder))
+        ) {
+            pause(game, phase, responder)
+        } else game
+    }
+
+    fun pause(
+        game: StoredGame,
+        completedPhase: Stage? = null,
+        completedPlayer: PlayerId? = null,
+    ): StoredGame {
         val runner = game.botRunner ?: return game
         return game.copy(
             botRunner =
                 runner.copy(
                     epoch = nextEpoch(runner),
                     paused = true,
+                    pausedAfterPhase = completedPhase,
+                    pausedAfterPlayer = completedPlayer,
                     runnerId = null,
                     leaseUntil = 0,
                 )
@@ -176,8 +265,12 @@ internal object BotAutomation {
         runnerId: String,
         expectedEpoch: Int?,
         now: Long = System.currentTimeMillis(),
+        pauseAfterPhase: Boolean? = null,
     ): BotWork {
         requireUuid(runnerId)
+        if ((operation == "set-phase-pause") != (pauseAfterPhase != null)) {
+            throw ServiceFailure(400, "INVALID_REQUEST")
+        }
         val stored =
             service.store.update(id) { current ->
                 requireCreator(service, current, access)
@@ -191,55 +284,71 @@ internal object BotAutomation {
                 if (!active(current) && operation !in setOf("pause", "release")) {
                     throw ServiceFailure(422, "GAME_INACTIVE")
                 }
-                when (operation) {
-                    "pause" -> pause(current)
-                    "release" -> {
-                        if (runner.runnerId != runnerId)
-                            throw ServiceFailure(409, "BOT_RUNNER_BUSY")
-                        current.copy(
-                            botRunner =
-                                runner.copy(
-                                    epoch = nextEpoch(runner),
-                                    runnerId = null,
-                                    leaseUntil = 0,
-                                )
-                        )
-                    }
-                    "renew" -> {
-                        requireLease(current, runnerId, runner.epoch, now)
-                        current.copy(botRunner = runner.copy(leaseUntil = now + LEASE_MILLIS))
-                    }
-                    "claim",
-                    "resume" -> {
-                        if (
-                            operation == "claim" &&
-                                runner.runnerId != null &&
-                                runner.runnerId != runnerId &&
-                                runner.leaseUntil > now
-                        ) {
-                            throw ServiceFailure(409, "BOT_RUNNER_BUSY")
+                val updated =
+                    when (operation) {
+                        "pause" -> pause(current)
+                        "set-phase-pause" -> {
+                            val enabled = pauseAfterPhase == true
+                            val updated =
+                                current.copy(botRunner = runner.copy(pauseAfterPhase = enabled))
+                            if (enabled) updated else resumeReviewPause(updated)
                         }
-                        if (operation == "claim" && runner.paused) current
-                        else
+                        "release" -> {
+                            if (runner.runnerId != runnerId)
+                                throw ServiceFailure(409, "BOT_RUNNER_BUSY")
                             current.copy(
                                 botRunner =
                                     runner.copy(
-                                        epoch =
-                                            if (
-                                                operation == "claim" &&
-                                                    runner.runnerId == runnerId &&
-                                                    runner.leaseUntil > now
-                                            ) {
-                                                runner.epoch
-                                            } else nextEpoch(runner),
-                                        paused = false,
-                                        runnerId = runnerId,
-                                        leaseUntil = now + LEASE_MILLIS,
+                                        epoch = nextEpoch(runner),
+                                        runnerId = null,
+                                        leaseUntil = 0,
                                     )
                             )
+                        }
+                        "renew" -> {
+                            requireLease(current, runnerId, runner.epoch, now)
+                            current.copy(botRunner = runner.copy(leaseUntil = now + LEASE_MILLIS))
+                        }
+                        "claim",
+                        "resume" -> {
+                            if (
+                                operation == "claim" &&
+                                    runner.runnerId != null &&
+                                    runner.runnerId != runnerId &&
+                                    runner.leaseUntil > now
+                            ) {
+                                throw ServiceFailure(409, "BOT_RUNNER_BUSY")
+                            }
+                            if (operation == "claim" && runner.paused) current
+                            else
+                                current.copy(
+                                    botRunner =
+                                        runner.copy(
+                                            epoch =
+                                                if (
+                                                    operation == "claim" &&
+                                                        runner.runnerId == runnerId &&
+                                                        runner.leaseUntil > now
+                                                ) {
+                                                    runner.epoch
+                                                } else nextEpoch(runner),
+                                            paused = false,
+                                            pausedAfterPhase = null,
+                                            pausedAfterPlayer = null,
+                                            runnerId = runnerId,
+                                            leaseUntil = now + LEASE_MILLIS,
+                                        )
+                                )
+                        }
+                        else -> throw ServiceFailure(400, "INVALID_REQUEST")
                     }
-                    else -> throw ServiceFailure(400, "INVALID_REQUEST")
-                }
+                if (
+                    updated.phaseOutcomesDeferred &&
+                        updated.botRunner?.paused == false &&
+                        active(updated)
+                ) {
+                    service.driver.continuePhase(updated)
+                } else updated
             }
         return work(stored, now)
     }
@@ -256,7 +365,9 @@ internal object BotAutomation {
         val game = service.store.read(id)
         requireCreator(service, game, access)
         val runner = requireRunner(game)
-        if (runner.epoch != epoch) throw ServiceFailure(409, "BOT_STALE_EPOCH")
+        // A command that caused a phase pause can reconcile a lost response against its receipt.
+        val phasePause = runner.pausedAfterPhase != null && epoch == runner.epoch - 1
+        if (runner.epoch != epoch && !phasePause) throw ServiceFailure(409, "BOT_STALE_EPOCH")
         if (!runner.paused && active(game)) requireLease(game, runnerId, epoch, now)
         return work(game, now)
     }
@@ -370,13 +481,29 @@ internal object BotAutomation {
                                 "A ready automated seat requires its controller."
                             }
                         val decision = decisionId(game, seat)
+                        val state = game.state()
+                        val observation = BotObservations.from(state, seat)
+                        val current =
+                            bot.policyVersion == HARD_AUTOMATA_VERSION ||
+                                bot.policyVersion == PREVIOUS_HARD_AUTOMATA_VERSION
+                        val initiative =
+                            if (current && observation.decision == "buy-tokens") {
+                                PhaseInitiativePolicy.project(state.viewForDecision(seat), seat)
+                            } else null
+                        val finish =
+                            if (current && observation.decision == "purchase-advances") {
+                                FinalAdvancePlan.quote(state, state.viewForDecision(seat), seat)
+                            } else null
                         BotDecisionWork(
                             seat = seat,
                             difficulty = bot.difficulty,
                             seed = bot.seed xor decision.hashCode(),
                             decisionId = decision,
                             submissionVersion = game.submissionVersions[seat],
-                            observation = BotObservations.from(game.state(), seat),
+                            observation = observation,
+                            policyVersion = bot.policyVersion,
+                            initiative = initiative,
+                            finish = finish,
                         )
                     },
             operationReceipts = runner.receipts.map(BotOperationReceipt::operationId),

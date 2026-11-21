@@ -84,6 +84,10 @@ object BoardGame {
         BoardRulesContext(
             configuration = state.catalog,
             board = state.board,
+            onlyDarkPiecesBlockCaravan =
+                state.header.darkCaravanFromTurn?.let { fromTurn ->
+                    (state.turnNumber ?: 0) >= fromTurn
+                } ?: false,
             players =
                 state.players.mapValues { entry ->
                     val player = entry.value
@@ -312,7 +316,15 @@ object BoardGame {
         return buildList {
             add("pass")
             for (province in context.configuration.provinces) {
-                addAll(placementChoices(context, actor, province.id, player.poolTokens))
+                addAll(
+                    placementChoices(
+                        context,
+                        actor,
+                        province.id,
+                        player.poolTokens,
+                        ExpansionReach.routesTo(context, actor, province.id),
+                    )
+                )
                 if (markerReductionBlocker(state, actor, province.id) == null) {
                     add("reduce-marker ${province.id}")
                 }
@@ -498,12 +510,13 @@ object BoardGame {
         actor: PlayerId,
         province: ProvinceId,
         poolTokens: Int,
+        routes: List<ExpansionRoute>,
     ): List<String> {
         return buildList {
-            if (canPlace(context, actor, province, 1, poolTokens)) {
+            if (canPlace(context, actor, province, 1, poolTokens, routes)) {
                 add("place 1 $province")
             }
-            if (canAttack(context, actor, province, poolTokens)) {
+            if (canAttack(context, actor, province, poolTokens, routes)) {
                 add("attack $province")
             }
         }
@@ -527,6 +540,7 @@ object BoardGame {
         actor: PlayerId,
         province: ProvinceId,
         poolTokens: Int,
+        routes: List<ExpansionRoute>,
     ): Boolean =
         try {
             canPlace(
@@ -535,6 +549,7 @@ object BoardGame {
                 province,
                 attackTokens(context, actor, province),
                 poolTokens,
+                routes,
             )
         } catch (failure: RuleViolation) {
             // Empty and friendly provinces have no competition action.
@@ -547,11 +562,8 @@ object BoardGame {
         province: ProvinceId,
         tokens: Int,
         pool: Int,
+        routes: List<ExpansionRoute>,
     ): Boolean =
-        try {
-            BoardPlacementRules.evaluate(context, actor, province, tokens, pool)
-            true
-        } catch (failure: RuleViolation) {
-            false
-        }
+        BoardPlacementRules.assessGeneratedRoutes(context, actor, province, tokens, pool, routes)
+            .plan != null
 }

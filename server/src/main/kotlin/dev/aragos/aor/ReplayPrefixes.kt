@@ -29,3 +29,22 @@ internal class ReplayPrefixes(private val header: GameHeader, revisions: List<Re
         return entries.fold(GameState(header)) { state, text -> step(state, TextCodec.parse(text)) }
     }
 }
+
+/** Include superseded play so rewinding an upgraded game retains each historical turn's rules. */
+internal fun StoredGame.latestRecordedTurn(turn: (GameState, GameState) -> Int?): Int {
+    val prefixes = ReplayPrefixes(header, revisions)
+    var state = GameState(header)
+    var entries = emptyList<String>()
+    var latestTurn = 0
+    for (revision in revisions) {
+        val retained = revision.replaceFrom?.let(entries::take) ?: entries
+        if (revision.replaceFrom != null) state = prefixes.restore(entries, revision.replaceFrom)
+        for (line in revision.entries) {
+            val next = prefixes.step(state, TextCodec.parse(line))
+            latestTurn = maxOf(latestTurn, turn(state, next) ?: 0)
+            state = next
+        }
+        entries = retained + revision.entries
+    }
+    return latestTurn
+}

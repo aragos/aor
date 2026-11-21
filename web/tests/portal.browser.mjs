@@ -54,6 +54,9 @@ export async function checkPortal(page, web) {
     await page.click('Add');
     assert.equal(await page.evaluate(`[...document.querySelectorAll('button')].find(button=>button.textContent==='Create game').disabled`), false);
     assert.equal(await page.evaluate(`document.querySelectorAll('.create-registered select').length`), 0, 'Creation options use visible buttons');
+    await page.click('Add automated opponent');
+    assert.match(await page.evaluate(`document.querySelector('.automated-opponents').textContent`), /experimental.*4 of 6 seats/);
+
     for (const theme of ['dark', 'light']) {
         await page.evaluate(`document.documentElement.dataset.theme = '${theme}'`);
         await assertTextContrast(page, `${theme} portal and player selection`);
@@ -98,6 +101,9 @@ export async function checkPortal(page, web) {
     await page.click('Create game');
     await page.wait(`window.portalRequests.some(request => request.path === '/api/games' && request.body?.name === 'Friday with friends')`, 'registered creation submits chosen name');
     await page.wait(`document.querySelector('.create-registered [role=alert]')`, 'creation failure surfaced');
+    assert.equal(await page.evaluate(`window.portalRequests.find(request => request.path === '/api/games' && request.body?.name === 'Friday with friends').body.bots.length`), 1, 'Registered creation sends one Hard automated seat without difficulty options');
+    assert.equal(await page.evaluate(`document.querySelectorAll('.automated-seat').length`), 1, 'Failed creation preserves selected opponents');
+
     assert.equal(await page.evaluate(`document.querySelector('#game-name').value`), 'Friday with friends', 'Failed registered creation preserves the game name');
     await page.send('Emulation.clearDeviceMetricsOverride');
     await page.send('Page.navigate', {url: web + '/tests/portal-harness.html?admin=false'});

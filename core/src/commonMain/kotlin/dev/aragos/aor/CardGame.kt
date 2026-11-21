@@ -103,7 +103,7 @@ sealed interface CardDecision : TurnDecision {
             get() = "war-surrender"
 
         override fun choices(state: GameState): List<String> {
-            val context = state.cardContext()
+            val context = state.cardContext
             val eligible = WarRules.eligibleProvinces(context, victory.winner, victory.loser)
             val mainland = eligible.filter { province ->
                 context.province(province).overseas == null
@@ -127,7 +127,7 @@ object CardGame {
     internal const val REPLACEMENT_TOKEN_COST = 1
 
     fun isBurden(state: GameState, cardId: String): Boolean =
-        CardRules.isBurden(state.cardContext(), cardId)
+        CardRules.isBurden(state.cardContext, cardId)
 
     /**
      * Called before the normal driver skips an empty hand: an empty-handed player still hosts
@@ -138,7 +138,7 @@ object CardGame {
         if (state.flow.decisions.isNotEmpty()) return state
         val actor = state.flow.actor ?: return state
         val war = state.activeWar ?: return state
-        val context = state.cardContext()
+        val context = state.cardContext
         if (!WarRules.canContinue(context, war)) return state.copy(activeWar = null)
         if (war.lastRound == currentRound(state)) return state
         val hasMilitaryChoice =
@@ -169,7 +169,7 @@ object CardGame {
         val card = requireNotNull(handCard) { "A validated card play has a hand reference." }
         requirePlayableCard(state, card.definition.id)
         val resolution =
-            CardRules.resolve(state.cardContext(), actor, CardPlay(card.definition.id, choice))
+            CardRules.resolve(state.cardContext, actor, CardPlay(card.definition.id, choice))
         val committed =
             state.replacePlayer(
                 player.copy(hand = player.hand.filterNot { held -> held.reference == reference })
@@ -279,8 +279,7 @@ object CardGame {
         val pending = requireNotNull(frame) { "A validated War roll requires a pending frame." }
         val next = state.popDecision()
         return when (
-            val result =
-                WarRules.roll(next.cardContext(), pending.war, WarDice(values[0], values[1]))
+            val result = WarRules.roll(next.cardContext, pending.war, WarDice(values[0], values[1]))
         ) {
             is WarResult.Tie -> {
                 val tied =
@@ -288,7 +287,7 @@ object CardGame {
                         .copy(activeWar = result.war.copy(lastRound = currentRound(state)))
                         .gainMisery(result.war.initiator, 1)
                         .gainMisery(result.war.opponent, 1)
-                if (WarRules.canContinue(tied.cardContext(), result.war)) {
+                if (WarRules.canContinue(tied.cardContext, result.war)) {
                     tied
                 } else {
                     tied.copy(activeWar = null)
@@ -297,7 +296,7 @@ object CardGame {
             is WarResult.Victory -> {
                 val won = next.copy(activeWar = null)
                 val eligible =
-                    WarRules.eligibleProvinces(won.cardContext(), result.winner, result.loser)
+                    WarRules.eligibleProvinces(won.cardContext, result.winner, result.loser)
                 if (result.requiredTransfers == 0 || eligible.isEmpty()) {
                     settleWar(won, result, emptySet())
                 } else {
@@ -320,7 +319,7 @@ object CardGame {
         victory: WarResult.Victory,
         provinces: Set<ProvinceId>,
     ): GameState {
-        val settlement = WarRules.surrender(state.cardContext(), victory, provinces)
+        val settlement = WarRules.surrender(state.cardContext, victory, provinces)
         return CardMarkerPlacements.war(state, settlement)
     }
 
@@ -342,7 +341,7 @@ object CardGame {
 
     fun patronize(state: GameState, actor: PlayerId, leader: LeaderId): GameState {
         state.requirePurchaseStep(actor, PurchaseStep.ADVANCES)
-        val claim = LeaderRules.claim(state.cardContext(), actor, leader)
+        val claim = LeaderRules.claim(state.cardContext, actor, leader)
         val buyer = state.playerState(actor)
         val recipient = state.playerState(claim.recipient)
         return state
@@ -462,7 +461,7 @@ object CardGame {
             }
         val awaitingLoss =
             if (
-                !state.cardContext().finalCardPlay &&
+                !state.cardContext.finalCardPlay &&
                     ordered.playerState(resolution.victim).misery != MiseryStep.CHAOS
             ) {
                 ordered.pushDecision(CardDecision.CivilWarLoss(resolution.victim))
@@ -537,7 +536,7 @@ object CardGame {
 
     /** A recycled War stays in hand if its earlier battle is still unresolved. */
     internal fun canPassFinalCards(state: GameState, actor: PlayerId): Boolean {
-        val context = state.cardContext()
+        val context = state.cardContext
         return state.playerState(actor).hand.all { card ->
             CardRules.isBurden(context, card.definition.id) ||
                 isBlockedByWar(state, card.definition.id)
@@ -553,7 +552,7 @@ object CardGame {
         actor: PlayerId,
         militaryOnly: Boolean = false,
     ): List<String> {
-        val context = state.cardContext()
+        val context = state.cardContext
         return state.playerState(actor).hand.flatMap { card ->
             val spec = CardEffectData.forCard(card.definition.id)
             if (militaryOnly && !spec.isMilitary()) return@flatMap emptyList()

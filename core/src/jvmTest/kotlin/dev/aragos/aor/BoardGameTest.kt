@@ -337,7 +337,46 @@ class BoardGameTest {
 
         val failure = assertFailsWith<RuleViolation> { state.act("place 1 rome") }
 
-        assertThat(failure.code).isEqualTo(ViolationCode.UNREACHABLE_PROVINCE)
+        assertThat(failure.code).isEqualTo(ViolationCode.CARAVAN_INTERMEDIATE_OCCUPIED)
+    }
+
+    @Test
+    fun caravanCanAttackNurembergThroughAnOpponentsWhiteSalzburgToken() {
+        val state = caravanInVienna(PieceSide.WHITE)
+
+        val attacked = state.act("attack nuremberg").win()
+
+        assertThat(attacked.board.pieces[id("nuremberg")])
+            .isEqualTo(ProvincePieces.Marker(p1, PieceSide.WHITE))
+        assertThat(attacked.board.pieces[id("salzburg")])
+            .isEqualTo(state.board.pieces[id("salzburg")])
+    }
+
+    @Test
+    fun caravanOfferExplainsWhyAnOpponentsDarkSalzburgTokenBlocksNuremberg() {
+        val state = caravanInVienna(PieceSide.COLOURED)
+
+        val offer =
+            state.viewForPlayer(p1).expansionOffers.single { it.destination == id("nuremberg") }
+
+        assertThat(offer.reachable).isFalse()
+        assertThat(offer.blockers).containsExactly(ViolationCode.CARAVAN_INTERMEDIATE_OCCUPIED)
+    }
+
+    private fun caravanInVienna(salzburgSide: PieceSide): GameState {
+        val board =
+            BoardState()
+                .placeMarker(id("vienna"), p1)
+                .board
+                .placeMarker(id("nuremberg"), p2)
+                .board
+                .placeMarker(id("prague"), p2)
+                .board
+                .replaceWithToken(id("st-gall"), p2)
+                .board
+                .replaceWithToken(id("salzburg"), p2, salzburgSide)
+                .board
+        return expansion(board, advances = mapOf(p1 to setOf(AdvanceId.CARAVAN)), playerCount = 4)
     }
 
     @Test
@@ -1043,18 +1082,26 @@ class BoardGameTest {
         board: BoardState = BoardState(),
         advances: Map<PlayerId, Set<AdvanceId>> = emptyMap(),
         ships: Map<PlayerId, ShippingCapability> = emptyMap(),
+        playerCount: Int = 3,
     ): GameState {
-        val players = listOf(Player(p1, "One"), Player(p2, "Two"), Player(p3, "Three"))
-        val capitals = listOf("venice", "genoa", "barcelona")
+        val players =
+            listOf(
+                    Player(p1, "One"),
+                    Player(p2, "Two"),
+                    Player(p3, "Three"),
+                    Player(PlayerId("p4"), "Four"),
+                )
+                .take(playerCount)
+        val capitals = listOf("venice", "genoa", "barcelona", "paris")
         return GameState(
             header = GameHeader(players, p1),
             turnNumber = 1,
             stage = Stage.EXPANSION,
             flow = TurnFlow(actor = p1, phaseStarted = true),
-            turnOrderSelection = TurnOrderSelection(listOf(p1, p2, p3)),
+            turnOrderSelection = TurnOrderSelection(players.map(Player::id)),
             board = board,
-            deck = CardData.epochOne.drop(3).map(CardDefinition::id),
-            deckHistory = DeckHistory(nextDraw = 4),
+            deck = CardData.epochOne.drop(playerCount).map(CardDefinition::id),
+            deckHistory = DeckHistory(nextDraw = playerCount + 1),
             players =
                 players
                     .mapIndexed { index, player ->

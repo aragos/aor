@@ -5,6 +5,7 @@ import {createPortal} from 'react-dom';
 import {label, playerName, provinceName} from '../labels';
 import {t} from '../messages';
 import {HelpLink} from '../HelpLink';
+import {Commodity} from '../TablePanels';
 import {AccessLock, areaColors, CommodityIcon, commodityColors, LockedAreaPattern, PlayerPiece, SatellitePattern, SupportArrow} from './MapSymbols';
 import {useMapSelection} from './MapSelection';
 import {neighbors} from './ProvinceInspector';
@@ -100,7 +101,7 @@ function ProvinceLabel({province, pieces, snapshot, geometry, dimmed = false, co
 
 function occupancyDescription(snapshot: Snapshot, pieces?: ProvinceView): string {
     const owner = (id: string) => playerName(snapshot, id);
-    if (pieces?.marker) return t('board.markerOccupancy', {owner: owner(pieces.marker.owner), age: t(pieces.marker.side === 'WHITE' ? 'board.new' : 'board.old')});
+    if (pieces?.marker) return t('board.markerOccupancy', {owner: owner(pieces.marker.owner), age: t(pieces.marker.side === 'WHITE' ? 'board.new' : 'board.established')});
     return pieces?.tokens.map(tokens => t('board.tokenOccupancy', {owner: owner(tokens.owner), old: tokens.coloured, fresh: tokens.white})).join('; ') || t('table.unoccupied');
 }
 
@@ -179,6 +180,24 @@ function LoadedBoardMap({snapshot, busy, geometry, controlsHost}: BoardMapProps 
     const suppressClick = useRef(false);
     const {picker, selected, setSelected, selectedArea, setSelectedArea, selectedCard, setSelectedCard,
         selectedAdvance, setSelectedAdvance, focusRevision, inspection, setInspection, selectedAction, workspace} = useMapSelection();
+    const capitalPicker = picker?.kind === 'capital' ? picker : null;
+    const framedCapitals = useRef<string | null>(null);
+    const capitalFrame = capitalPicker ? `${capitalPicker.id}:${capitalPicker.eligible.join(',')}:${capitalPicker.selected.join(',')}` : null;
+    useLayoutEffect(() => {
+        if (!capitalPicker || !mapSize || capitalFrame === framedCapitals.current || workspace !== 'map') return;
+        framedCapitals.current = capitalFrame;
+        const positions = (capitalPicker.selected.length ? capitalPicker.selected : capitalPicker.eligible)
+            .map(id => geometry.provinces[id]?.label).filter(position => !!position);
+        if (!positions.length) return;
+        const xs = positions.map(([x]) => x), ys = positions.map(([, y]) => y);
+        const x = (Math.min(...xs) + Math.max(...xs)) / 2, y = (Math.min(...ys) + Math.max(...ys)) / 2;
+        setView(current => {
+            const frame = capitalPicker.selected.length ? current : fitMapView(bounds, mapSize);
+            if (capitalPicker.selected.length && x > frame.x + 50 && x < frame.x + frame.w - 50 &&
+                y > frame.y + 50 && y < frame.y + frame.h - 50) return current;
+            return clampMapView({...frame, x: x - frame.w / 2, y: y - frame.h / 2}, bounds, mapSize);
+        });
+    }, [bounds, capitalFrame, capitalPicker, geometry, mapSize, workspace]);
     useLayoutEffect(() => {
         setHovered(''); setFocused(''); setDismissedProvince('');
         if (document.activeElement instanceof SVGElement && svg.current?.contains(document.activeElement)) document.activeElement.blur();
@@ -324,6 +343,7 @@ function LoadedBoardMap({snapshot, busy, geometry, controlsHost}: BoardMapProps 
         if (Math.abs(dx) + Math.abs(dy) < 5 && !current.distance && !suppressClick.current) return;
         svg.current.setPointerCapture(event.pointerId);
         suppressClick.current = true;
+        setHovered('');
         const rect = svg.current.getBoundingClientRect();
         const next = current.distance && start.distance
             ? zoomView(start.view, start.distance / current.distance, start.x, start.y) : start.view;
@@ -346,7 +366,7 @@ function LoadedBoardMap({snapshot, busy, geometry, controlsHost}: BoardMapProps 
             : id === selected && id !== dismissedProvince,
         eligible: picker ? (picker.kind === 'area' ? picker.eligible.includes(definitions.get(id)?.area ?? '') : picker.eligible.includes(id)) : legalDestinations.has(id),
         neighbor: landNeighbors.has(id) || coastNeighbors.has(id),
-        emphasized: hovered === id || focused === id || id === inspectedProvince || commodityProvinces.has(id),
+        emphasized: hovered === id || hovered === `coast:${id}` || focused === id || id === inspectedProvince || commodityProvinces.has(id),
         commodity: commodityProvinces.has(id),
     });
     const highlightArea = (area: string) => ({
@@ -378,6 +398,23 @@ function LoadedBoardMap({snapshot, busy, geometry, controlsHost}: BoardMapProps 
         return [area, members.length && members.every(province => lockedProvinces.has(province.id))
             ? members[0].access.filter(requirement => members.every(province => province.access.includes(requirement))) : []];
     }));
+    const tooltipTarget = hovered || focused;
+    const tooltipCoast = tooltipTarget.startsWith('coast:') ? tooltipTarget.slice(6) : '';
+    const tooltipProvince = definitions.get(tooltipCoast || tooltipTarget);
+    const tooltipArea = tooltipTarget.startsWith('area:') ? tooltipTarget.slice(5) : '';
+    const tooltipSea = tooltipTarget.startsWith('sea:') ? tooltipTarget.slice(4) : '';
+    const tooltipTitle = tooltipCoast ? `${provinceName(tooltipCoast)} ${t('board.coastalWater')}`
+        : tooltipProvince ? provinceName(tooltipProvince.id)
+        : tooltipArea ? `${t('board.area')} ${tooltipArea}` : tooltipSea ? label(tooltipSea)
+        : geometry.provinces[tooltipTarget] ? provinceName(tooltipTarget) : '';
+    const tooltipDescription = tooltipProvince
+        ? (tooltipProvince.satellite ? t('board.satellite') : <span className="map-tooltip-market">
+            <span>{t('board.market')} {tooltipProvince.marketNumber}</span>
+            {tooltipProvince.commodities.map(commodity => <Commodity key={commodity} commodity={commodity}/>)}
+        </span>)
+        : tooltipArea && areaAccess[tooltipArea]?.length ? t('board.requires', {advances: areaAccess[tooltipArea].map(requirement => label(requirement)).join(', ')})
+        : tooltipSea && catalog.seaAreas[tooltipSea] ? `${t('board.area')} ${catalog.seaAreas[tooltipSea]}`
+        : geometry.provinces[tooltipTarget] ? t('board.notUsed') : '';
     const overseasLocks = Object.fromEntries(['FAR_EAST', 'NEW_WORLD'].map(group => {
         const members = catalog.provinces.filter(province => province.overseas === group);
         return [group, members.length > 0 && members.every(province => lockedProvinces.has(province.id))];
@@ -412,7 +449,7 @@ function LoadedBoardMap({snapshot, busy, geometry, controlsHost}: BoardMapProps 
                 onPointerDown={pointerDown} onPointerMove={pointerMove} onPointerUp={pointerEnd}
                 onPointerLeave={() => setHovered('')}
                 onClick={event => {
-                    if (!suppressClick.current && event.target instanceof Element && !event.target.closest('[data-map-province].active, [data-coastal-space], [data-map-area-label]')) clearInspection();
+                    if (!suppressClick.current && event.target instanceof Element && !event.target.closest('[data-map-province].active, [data-coastal-space], [data-map-area-label], [data-capital-choice]')) clearInspection();
                 }}
                 onPointerCancel={event => {pointerEnd(event); suppressClick.current = true;}}>
                 <defs>
@@ -437,8 +474,8 @@ function LoadedBoardMap({snapshot, busy, geometry, controlsHost}: BoardMapProps 
                 <g clipPath={`url(#${prefix}-frame)`}>
                     <path d={geometry.frame} fill="#90b8cb"/>
                     {Object.entries(geometry.seas).map(([sea, shape]) => <g key={sea} data-sea={sea} data-sea-area={catalog.seaAreas[sea]}
-                        className={`map-sea${selectedSeas.has(sea) ? ' is-connected' : ''}`}>
-                        <title>{label(sea)}{catalog.seaAreas[sea] ? ` · ${t('board.area')} ${catalog.seaAreas[sea]}` : ''}</title>
+                        className={`map-sea${selectedSeas.has(sea) ? ' is-connected' : ''}`}
+                        onPointerEnter={() => setHovered(`sea:${sea}`)} onPointerLeave={() => setHovered('')}>
                         <path className="sea-shape" d={shape.path} fill={selectedSeas.has(sea) ? `url(#${prefix}-connected-sea)` : shape.color} stroke="#739eac" strokeWidth={1}/>
                         <text className="sea-name" x={shape.label[0]} y={shape.label[1]} textAnchor="middle" fontSize={20} fill="#315d70" fontWeight={500} aria-label={label(sea)}
                             textLength={label(sea).length <= 18 ? label(sea).length * 9.5 : undefined} lengthAdjust="spacingAndGlyphs"
@@ -448,9 +485,8 @@ function LoadedBoardMap({snapshot, busy, geometry, controlsHost}: BoardMapProps 
                         </text></g>)}
                     <path data-map-terrain d={geometry.terrain} fill="#e3e3d5" stroke="#b3b7a5"/>
                     {Object.entries(geometry.coasts).map(([id, path]) => definitions.has(id) && <g key={id} data-coastal-space={id}
-                        onPointerEnter={() => setHovered(id)} onPointerLeave={() => setHovered('')}
+                        onPointerEnter={() => setHovered(`coast:${id}`)} onPointerLeave={() => setHovered('')}
                         onClick={() => {if (!suppressClick.current) choose(id);}}>
-                        <title>{provinceName(id)} {t('board.coastalWater')}</title>
                         <path d={path} fill={id === inspectedProvince || coastNeighbors.has(id) ? '#9adddf' : '#d2efed'} stroke="#56929c" strokeWidth={1.4}/>
                         <ProvinceHighlight path={path} {...highlight(id)} outline={false}/>
                     </g>)}
@@ -467,7 +503,7 @@ function LoadedBoardMap({snapshot, busy, geometry, controlsHost}: BoardMapProps 
                             aria-pressed={definition ? highlight(id).selected : undefined}
                             aria-label={definition ? `${provinceName(id)}${definition.capital ? `, ${t('board.capital')}` : ''}, ${t('board.market')} ${definition.marketNumber}, ${definition.satellite ? t('board.satellite') : definition.commodities.map(value => label(value)).join(', ')}, ${occupancyDescription(snapshot, pieces)}${!picker && reachable.has(id) ? `, ${t('board.reachable')}` : ''}` : undefined}
                             className={`map-province ${definition ? 'active' : 'inactive'} ${expansionHighlight && definition ? reachable.has(id) ? 'expansion-reachable' : 'expansion-unreachable' : ''} ${picked ? 'picked' : ''} ${eligible ? 'eligible' : ''}`}
-                            onPointerEnter={() => {if (definition) setHovered(id);}} onPointerLeave={() => setHovered('')}
+                            onPointerEnter={() => setHovered(id)} onPointerLeave={() => setHovered('')}
                             onFocus={() => {
                                 setFocused(id); setTabProvince(id);
                                 reveal(shape.label);
@@ -476,7 +512,6 @@ function LoadedBoardMap({snapshot, busy, geometry, controlsHost}: BoardMapProps 
                                 if (definition) traverse(event, id, catalog.provinces.map(province => province.id), 'data-map-province');
                                 if (definition && (event.key === 'Enter'  || event.key === ' ')) {event.preventDefault(); suppressClick.current = false; choose(id);}
                             }}>
-                            <title>{provinceName(id)}{definition ? definition.commodities.map(commodity => ` · ${label(commodity, 'commodity')}`).join('') : ` · ${t('board.notUsed')}`}</title>
                             <path className="province-shape" d={shape.path}
                                 fill={!definition ? '#daddd1' : definition.satellite ? `url(#${prefix}-satellite)` : definition.commodities.length > 1 ? `url(#${prefix}-${id})` : commodityColors[definition.commodities[0]][0]}
                                 stroke="#777d6c" strokeWidth={1.4}/>
@@ -546,7 +581,6 @@ function LoadedBoardMap({snapshot, busy, geometry, controlsHost}: BoardMapProps 
                         onFocus={() => {setFocused(`area:${area}`); setTabArea(area); reveal(shape.label);}} onBlur={() => setFocused('')}
                         onClick={() => {if (!suppressClick.current) chooseArea(area);}}
                         onKeyDown={event => {traverse(event, area, activeAreaIds, 'data-map-area-label'); if (event.key === 'Enter' || event.key === ' ') {event.preventDefault(); suppressClick.current = false; chooseArea(area);}}}>
-                        <title>{`${t('board.area')} ${area}${areaAccess[area].length ? ` · ${areaAccess[area].map(requirement => label(requirement)).join(', ')}` : ''}`}</title>
                         <rect x={shape.label[0] - 65} y={shape.label[1] - 55} width={130} height={110} fill="transparent"/>
                         <rect className="area-label-bg" x={shape.label[0] - 44} y={shape.label[1] - 28} width={88} height={56} rx={8}
                             fill={areaColors[area]} stroke={highlightArea(area).selected ? '#143e4e' : highlightArea(area).eligible ? '#2b6d9a' : '#fffdf3'} strokeWidth={highlightArea(area).selected || highlightArea(area).eligible ? 5 : 2.5}/>
@@ -562,9 +596,26 @@ function LoadedBoardMap({snapshot, busy, geometry, controlsHost}: BoardMapProps 
                             {overseasLocks[group] && <g data-overseas-lock={group}><title>{t('board.advanceRequired')}</title><AccessLock x={146} y={y - 17} size={20}/></g>}
                         </g>)}
                     </g>
+                    {capitalPicker?.eligible.map(id => {
+                        const shape = geometry.provinces[id];
+                        if (!shape) return null;
+                        const picked = capitalPicker.selected.includes(id);
+                        return <g key={id} data-capital-choice={id} data-selected={picked} className="capital-map-choice"
+                            transform={`translate(${shape.label.join(' ')}) scale(${textureScale})`}
+                            aria-hidden="true" onClick={() => {if (!suppressClick.current) choose(id);}}
+                            onPointerEnter={() => setHovered(id)} onPointerLeave={() => setHovered('')}>
+                            <circle r={picked ? 15 : 13}/>
+                            <PlayerPiece capital={id} size={18}/>
+                        </g>;
+                    })}
                 </g>
                 <path d={geometry.frame} fill="none" stroke="#84958b" strokeWidth={2} pointerEvents="none"/>
             </svg>
+            {tooltipTitle && <div className="map-tooltip" role="tooltip">
+                <strong>{tooltipTitle}</strong>
+                {tooltipDescription && <span>{tooltipDescription}</span>}
+                {tooltipProvince && <span>{occupancyDescription(snapshot, occupancy.get(tooltipProvince.id))}</span>}
+            </div>}
         </div>
 
     </section>;

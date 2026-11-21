@@ -23,7 +23,7 @@ export async function checkRequestRecovery(page, web, baseline) {
         submitted: [window.uiSnapshot.viewerId], submissionVersion: 'new-private-version',
         submissionReceipts: [window.uiCommands[0].operationId]})`);
     await page.wait(`document.querySelector('.decision-panel .success')?.textContent.includes('request completed')`, 'late private receipt confirms the original request');
-    assert.match(await page.evaluate(`document.querySelector('.private-draft-status').textContent`), /Saved privately: 7/);
+    assert.match(await page.evaluate(`document.querySelector('.private-draft-status').textContent`), /Your private submission: 7/);
     await page.fill('#bid', '9');
     assert.match(await page.evaluate(`document.querySelector('.private-draft-status').textContent`), /Not submitted: 9/);
     assert.equal(await page.evaluate('window.uiCommands.length'), 1);

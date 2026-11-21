@@ -37,6 +37,8 @@ async function checkMapToolbar(page, web) {
     await escape(page);
     await page.wait(`!document.querySelector('.reference-dialog')`, 'map key dismissal');
     assert.equal(await page.evaluate(`document.activeElement.matches('.map-zoom .help-link')`), true);
+    const visiblePhases = () => page.evaluate(`[...document.querySelectorAll('.phase-timeline li')].filter(phase => phase.checkVisibility()).length`);
+    let widePhases = 0;
     for (const width of [1440, 900, 390]) {
         await page.send('Emulation.setDeviceMetricsOverride', {width, height: 1000, deviceScaleFactor: 1, mobile: width < 700});
         await page.evaluate(`new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))`);
@@ -51,6 +53,24 @@ async function checkMapToolbar(page, web) {
         if (layout.visible) assert(layout.barBottom <= layout.mapTop + 1, 'Controls sit above the map');
         assert.equal(await page.evaluate(`document.querySelector('#bid').value`), '7', 'Resizing preserves the bid');
         assert.equal(await page.evaluate(`document.documentElement.scrollWidth <= innerWidth`), true);
+        if (width === 1440) widePhases = await visiblePhases();
+        if (width === 390) {
+            assert(await visiblePhases() < widePhases, 'Timeline reveals more phases when there is room');
+            assert.equal(await page.evaluate(`document.querySelector('.map-size-toggle')`), null);
+        }
+        assert.equal(await page.evaluate(`document.querySelector('.phase-timeline [aria-current=step]').textContent`), 'Capital bids');
+        assert.equal(await page.evaluate(`(() => {
+            const phases = [...document.querySelectorAll('.phase-timeline li')].filter(phase => phase.checkVisibility());
+            return phases.slice(1).every((phase, index) => {
+                const phaseStart = phase.getBoundingClientRect().left;
+                const previousEnd = phases[index].getBoundingClientRect().right;
+                const chevron = getComputedStyle(phase, '::before');
+                const size = parseFloat(chevron.width);
+                const center = phaseStart + phase.clientLeft + parseFloat(chevron.left) + size / 2;
+                const radius = size / Math.sqrt(2);
+                return center - radius > previousEnd && center + radius < phaseStart;
+            });
+        })()`), true, 'Phase chevrons fit entirely between visible phases');
         await page.viewportScreenshot(join(process.env.AOR_BROWSER_ARTIFACTS, `map-toolbar-${width}.png`));
     }
     await page.send('Emulation.setDeviceMetricsOverride', {width: 1440, height: 1000, deviceScaleFactor: 1, mobile: false});
@@ -62,6 +82,65 @@ async function checkMapToolbar(page, web) {
     await page.evaluate(`document.querySelector('.world-map').dispatchEvent(new KeyboardEvent('keydown', {key: '0', bubbles: true}))`);
     await page.wait(`document.querySelector('.world-map').getAttribute('viewBox') !== ${JSON.stringify(narrow)}`, 'keyboard controls remain available');
     await page.evaluate(`document.querySelector('.game-table').style.removeProperty('width')`);
+    const mapWidth = () => page.evaluate(`document.querySelector('.world-map').getBoundingClientRect().width`);
+    const actionsVisible = () => page.evaluate(`document.querySelector('.workspace-side').checkVisibility()`);
+    const compactWidth = await mapWidth();
+    const sizeButton = `document.querySelector('.map-size-toggle')`;
+    assert.equal(await page.evaluate(`${sizeButton}.getAttribute('aria-label')`), 'Expand map');
+    assert.equal(await page.evaluate(`${sizeButton}.textContent`), '');
+    await page.evaluate(`${sizeButton}.focus(); document.activeElement.click()`);
+    assert((await mapWidth()) > compactWidth + 200, 'Expanded desktop map uses the action column width');
+    assert.equal(await actionsVisible(), false, 'Expanded map hides the action pane');
+    assert.equal(await page.evaluate(`(() => {
+        const hand = document.querySelector('.table-hand').getBoundingClientRect();
+        const map = document.querySelector('.workspace-main').getBoundingClientRect();
+        return hand.width === map.width && hand.top === map.bottom;
+    })()`), true, 'The full-width hand sits directly below the expanded map');
+    assert.equal(await page.evaluate(`document.activeElement.getAttribute('aria-label')`), 'Minimize map');
+    await page.viewportScreenshot(join(process.env.AOR_BROWSER_ARTIFACTS, 'expanded-map.png'));
+    await page.evaluate(`document.querySelector('#tab-markets').click()`);
+    assert.equal(await actionsVisible(), true, 'Other workspaces show actions');
+    await page.evaluate(`document.querySelector('#tab-map').click()`);
+    assert.equal(await actionsVisible(), false, 'Returning to the expanded map hides actions again');
+    await page.evaluate(`${sizeButton}.click()`);
+    assert.equal(await mapWidth(), compactWidth);
+    assert.equal(await actionsVisible(), true);
+    assert.equal(await page.evaluate(`document.querySelector('#bid').value`), '7', 'The bid draft returns with the action pane');
+
+    for (const [seat, link] of game.links.entries()) await game.send(link, `bid-capital ${3 - seat}`);
+    const first = game.links[0];
+    const choosing = await game.snapshot(first);
+    assert.equal(choosing.game.stage, 'CAPITAL_CHOICE');
+    const choices = choosing.legalChoices.commands.map(command => command.split(' ')[1]);
+    await page.send('Page.navigate', {url: new URL(first.path, web).href});
+    await page.wait(`document.querySelector('[data-capital-choice]')`, 'Eligible capital markers on the live map');
+    assert.deepEqual(await page.evaluate(`[...document.querySelectorAll('[data-capital-choice]')].map(choice => choice.dataset.capitalChoice)`), choices);
+    await page.evaluate(`${sizeButton}.click()`);
+    await page.wait(`${sizeButton}.getAttribute('aria-expanded') === 'true'`, 'expanded live map');
+    await page.evaluate(`new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))`);
+    const target = choices[0];
+    const marker = await page.evaluate(`(() => {
+        const {x, y, width, height} = document.querySelector('[data-capital-choice="${target}"] circle').getBoundingClientRect();
+        return {x: x + width / 2, y: y + height / 2};
+    })()`);
+    await page.send('Input.dispatchMouseEvent', {type: 'mouseMoved', ...marker});
+    await page.wait(`document.querySelector('.map-tooltip strong')?.textContent`, 'Larger capital tooltip on hover');
+    assert.equal(await page.evaluate(`parseFloat(getComputedStyle(document.querySelector('.map-tooltip strong')).fontSize) >= 16`), true);
+    await page.viewportScreenshot(join(process.env.AOR_BROWSER_ARTIFACTS, 'capital-picker.png'));
+    await page.send('Input.dispatchMouseEvent', {type: 'mousePressed', button: 'left', clickCount: 1, ...marker});
+    await page.send('Input.dispatchMouseEvent', {type: 'mouseReleased', button: 'left', clickCount: 1, ...marker});
+    await page.wait(`document.querySelector('[data-capital-choice="${target}"][data-selected=true]')`, 'Capital map selection prepares confirmation');
+    assert.equal((await game.snapshot(first)).revision, choosing.revision);
+    await page.evaluate(`${sizeButton}.click()`);
+    await page.wait(`document.querySelector('.capital-confirmation:not(:disabled)').checkVisibility()`, 'Minimizing restores confirmation for the selected capital');
+    await page.send('Emulation.setDeviceMetricsOverride', {width: 390, height: 844, deviceScaleFactor: 1, mobile: true});
+    await page.wait(`document.querySelector('#tab-players') && document.querySelector('.capital-confirmation:not(:disabled)')`, 'Capital choice stays ready on the phone');
+    assert.equal(await page.evaluate(`document.documentElement.scrollWidth <= innerWidth`), true);
+    await page.viewportScreenshot(join(process.env.AOR_BROWSER_ARTIFACTS, 'capital-picker-phone.png'));
+    await page.click('Confirm');
+    await page.wait(`!document.querySelector('[data-capital-choice]')`, 'Committed capital clears its map targets');
+    assert.equal((await game.snapshot(first)).game.players.find(player => player.id === first.id).capital, target);
+    await page.send('Emulation.setDeviceMetricsOverride', {width: 1440, height: 1000, deviceScaleFactor: 1, mobile: false});
 }
 
 async function liveNoEffectOffer() {

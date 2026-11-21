@@ -64,8 +64,10 @@ try {
                 card.definition.id === leader.definition.id ? {...card, leaderDiscounts: [discount]} : card)};
         await show('play-cards', leaderChanges, ['play rebate-leader', 'pass']);
         await click('#tab-map');
-        const title = await page.evaluate(`document.querySelector('[data-map-province="${furProvince.id}"] > title').textContent`);
-        assert.match(title, /Fur/, 'Province hover text includes its commodity');
+        await page.evaluate(`document.querySelector('[data-map-province="${furProvince.id}"]').dispatchEvent(new FocusEvent('focusin', {bubbles:true}))`);
+        await page.wait(`document.querySelector('.map-tooltip')?.textContent.includes('Fur')`, 'Province tooltip includes its commodity');
+        assert.equal(await page.evaluate(`[...document.querySelectorAll('.map-tooltip .commodity-name svg[aria-hidden="true"]')]
+            .filter(icon => icon.checkVisibility()).length`), furProvince.commodities.length, 'Each commodity has a visible icon');
         assert.match(await page.evaluate(`document.querySelector('[data-map-province="${furProvince.id}"]').getAttribute('aria-label')`),
             /Fur/, 'The accessible province name retains its commodity');
         assert.match(await page.evaluate(`document.querySelector('[data-hand-card="rebate-leader"] .leader-discount.has-rebate').textContent`),
@@ -118,6 +120,10 @@ try {
             marker: {owner: other, side: 'COLOURED'}, tokens: []}],
             expansionOffers: [competition], expansionInspections: [competition]}, [`attack ${province.id}`, 'pass']);
         await click('#tab-map');
+        await page.evaluate(`document.querySelector('[data-map-province="${province.id}"]').dispatchEvent(new PointerEvent('pointerover', {bubbles: true}))`);
+        await page.wait(`document.querySelector('.map-tooltip')?.textContent.includes('established marker')`, 'Established marker in tooltip');
+        await capture(`tooltip-${width}`);
+        await page.evaluate(`document.querySelector('[data-map-province="${province.id}"]').dispatchEvent(new PointerEvent('pointerout', {bubbles: true}))`);
         await page.evaluate(`document.querySelector('[data-map-province="${province.id}"]').dispatchEvent(new KeyboardEvent('keydown', {key: 'Enter', bubbles: true}))`);
         await page.wait(`document.querySelector('.competition-odds')`, 'competition probability beside attack');
         assert.equal(await page.evaluate(`document.querySelector('.competition-odds').textContent`),

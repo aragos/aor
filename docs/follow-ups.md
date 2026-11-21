@@ -10,7 +10,7 @@ with their [README owners](../README.md#find-the-owner); no gameplay defaults aw
   memberships, histories/archives/receipts, pending secrets and closed games. Retain Firebase identity;
   record schema/revision, timings and continuity without secrets. Validate before single-writer cutover;
   agree retention/billing alerts. Existing file deployments need [import/cutover](deployment.md#import-file-storage).
-- Verify deployed [Friendly-to-Linear migration](design.md#linear-game) on representative saves/both
+- Verify deployed [legacy undo policy migration](design.md#friendly-game) on representative saves/both
   backends: prior edits/checkpoints, pending secrets/plans, concurrent writes, restart, idempotence and
   continued play. Record per-game outcomes/resolve failures before declaring rollout complete.
 - Configure optional patch auto-merge and Render refresh credentials if wanted; see

@@ -37,18 +37,22 @@ export function useActivityPlanner(snapshot: Snapshot, write?: WritePlan, quote?
         return () => {cardRequest.current = null;};
     }, [scope]);
     useEffect(() => {if (!available) setOpen(false);}, [available]);
-    const key = JSON.stringify([snapshot.revision, actions]);
+    const key = JSON.stringify(actions);
     useEffect(() => {
         if (!open || !request.current || !snapshot.planning?.available) return;
         let active = true;
         const timer = setTimeout(() => {
             void request.current!(actions).then(value => {
                 if (active) {setQuoted({key, value}); setError('');}
-            }).catch(failure => {if (active) setError(errorCode(failure));});
+            }).catch(failure => {
+                const code = errorCode(failure);
+                if (active && code !== 'STALE_REVISION') setError(code);
+            });
         }, 120);
         return () => {active = false; clearTimeout(timer);};
-    }, [actions, key, open, snapshot.planning?.available]);
+    }, [actions, key, open, snapshot.revision, snapshot.planning?.available]);
     const preview = quoted?.key === key && quoted.value.revision === snapshot.revision ? quoted.value : null;
+    const quotedDecision = quoted?.key === key ? quoted.value.preview.decision : null;
     const dirty = JSON.stringify(actions) !== JSON.stringify(saved?.actions ?? []);
     async function edit() {
         let view = snapshot.planning;
@@ -88,8 +92,8 @@ export function useActivityPlanner(snapshot: Snapshot, write?: WritePlan, quote?
         } finally { setSaving(false); }
     }
     async function append(command: string) {
-        if (!preview?.preview.decision || saved?.armed) return false;
-        setActions(current => [...current, {decision: preview.preview.decision!, command}]);
+        if (!quotedDecision || saved?.armed) return false;
+        setActions(current => [...current, {decision: quotedDecision, command}]);
         return true;
     }
     async function chooseCardPurchase(command: 'buy-card' | 'pass') {
@@ -125,7 +129,7 @@ export function useActivityPlanner(snapshot: Snapshot, write?: WritePlan, quote?
         cardPurchase, chooseCardPurchase, choosingCard,
         conflict: open && baseVersion !== (snapshot.planning?.version ?? null) && !saving,
         close: () => setOpen(false), removeFrom: (index: number) => setActions(current => current.slice(0, index)),
-        loading: choosingCard || open && !preview, supported: !!write && !!quote && available};
+        loading: choosingCard || open && quoted?.key !== key, supported: !!write && !!quote && available};
 }
 
 function CardPurchasePlanner({snapshot, planner, busy}: {
@@ -199,7 +203,7 @@ export function ActivityPlanner({snapshot, planner, busy}: {
     const ready = !busy && !planner.saving && (!planner.open || !!planner.preview);
     const help = {topic: 'plans', label: t('plan.helpTitle')};
     return <section className="activity-planner" aria-label={t('plan.title')} data-editing={planner.open}>
-        {(saved || planner.open && planner.dirty) && <p className="private-draft-status" role="status">{t(saved?.armed ? 'plan.armed' : planner.open && planner.dirty ? 'plan.unsaved' : 'plan.saved')}</p>}
+        {(saved?.armed || planner.open && planner.dirty) && <p className="private-draft-status" role="status">{t(saved?.armed ? 'plan.armed' : 'plan.unsaved')}</p>}
         {saved?.pause && <p className="blocker" role="status">{t(`plan.pause.${saved.pause}`)}</p>}
         {visibleActions.length > 0 && <ol className="plan-actions">{visibleActions.map(({action, index}) => {
             const effect = preview?.effects[index];

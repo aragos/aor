@@ -1,7 +1,7 @@
 import {lazy, Suspense, useEffect, useRef, useState} from 'react';
 import type {FormEvent} from 'react';
 import {ApiError, errorCode, request, requestSnapshot} from './api';
-import type {ApplicationConfig, BotDifficulty, CreatedGame, Snapshot, PlanningQuote} from './api';
+import type {ApplicationConfig, CreatedGame, Snapshot, PlanningQuote} from './api';
 import {t} from './messages';
 import {defaultVariants, migrateVariants, validVariants, Variants} from './Variants';
 import {usePersonalTheme} from './preferences';
@@ -16,7 +16,6 @@ import {hasPlayerAction, setTurnFavicon} from './favicon';
 import {startPolling} from './polling';
 import {AutomatedOpponents} from './AutomatedOpponents';
 import {useBotAutomation} from './ai/useBotAutomation';
-import {BotControls} from './ai/BotControls';
 import './app.css';
 
 const HostedApp = lazy(() => import('./HostedApp'));
@@ -24,10 +23,11 @@ const HostedApp = lazy(() => import('./HostedApp'));
 function ErrorMessage({code}: {code: string}) { return <p className="error" role="alert">{t(`error.${code}`)}</p>; }
 function isAccessFailure(code: string) { return ['UNAUTHORIZED', 'GAME_MEMBERSHIP_REQUIRED'].includes(code); }
 
-function CreateGame() {
+function CreateGame({automataVersion}: {automataVersion?: string}) {
     const [name, setName] = useState('');
     const [names, setNames] = useState('Alice\nBob\nCarol');
-    const [bots, setBots] = useState<BotDifficulty[]>([]);
+    const [botCount, setBotCount] = useState(0);
+    const [pauseAfterPhase, setPauseAfterPhase] = useState(false);
     const humanNames = names.split('\n').map(value => value.trim()).filter(Boolean);
     const [undoPolicy, setUndoPolicy] = useStoredSetting('undo-policy', 'regular-turn', isUndoPolicy);
     const [variants, setVariants] = useStoredSetting('variants', defaultVariants, validVariants, migrateVariants);
@@ -36,7 +36,7 @@ function CreateGame() {
     const [error, setError] = useState('');
     async function create(event: FormEvent) {
         event.preventDefault(); setBusy(true); setError('');
-        try { setCreated(await request<CreatedGame>('/api/games', undefined, {name: name.trim(), players: humanNames, bots: bots.map(difficulty => ({difficulty})), options: variants, undoPolicy})); }
+        try { setCreated(await request<CreatedGame>('/api/games', undefined, {name: name.trim(), players: humanNames, bots: Array.from({length: botCount}, () => ({})), pauseAfterPhase: botCount > 0 && pauseAfterPhase, options: variants, undoPolicy})); }
         catch (failure) { setError(errorCode(failure)); }
         finally { setBusy(false); }
     }
@@ -56,7 +56,8 @@ function CreateGame() {
             <input id="game-name" value={name} onChange={event => setName(event.target.value)} maxLength={80} required disabled={busy}/>
             <label htmlFor="names">{t('create.players')}</label>
             <textarea id="names" rows={6} value={names} onChange={event => setNames(event.target.value)} required/>
-            <AutomatedOpponents value={bots} onChange={setBots} humanCount={humanNames.length} disabled={busy}/>
+            <AutomatedOpponents count={botCount} onChange={setBotCount}
+                pauseAfterPhase={pauseAfterPhase} onPauseAfterPhaseChange={setPauseAfterPhase} version={automataVersion} humanCount={humanNames.length} disabled={busy}/>
             <p className="muted small">{t('create.threeEpochs')}</p>
             <details className="creation-settings"><summary>{t('table.configuration')}</summary>
             <Variants value={variants} onChange={setVariants} disabled={busy}/>
@@ -64,7 +65,7 @@ function CreateGame() {
                 choices={['regular-turn', 'competitive', 'friendly-turn', 'linear-game'].map(value => ({value, label: t(`undoPolicy.${value}`)}))}/>
             {undoPolicy === 'linear-game' && <p className="small">{t('history.linearDescription')}</p>}</details>
             {error && <ErrorMessage code={error}/>}
-            <button disabled={busy || humanNames.length < 1 || humanNames.length + bots.length < 3 || humanNames.length + bots.length > 6}>{t(busy ? 'status.working' : 'create.submit')}</button>
+            <button disabled={busy || humanNames.length < 1 || humanNames.length + botCount < 3 || humanNames.length + botCount > 6}>{t(busy ? 'status.working' : 'create.submit')}</button>
         </form>}
     </main>;
 }
@@ -74,7 +75,6 @@ function Game({id, token, pollInterval = 1000}: {id: string; token?: string; pol
     const [connectionError, setConnectionError] = useState('');
     const [actionError, setActionError] = useState<ApiError | null>(null);
     const [busy, setBusy] = useState(false);
-    const [saved, setSaved] = useState(false);
     const busyRef = useRef(false);
     const sequence = useRef(0);
     const etag = useRef<string>(undefined);
@@ -152,12 +152,23 @@ function Game({id, token, pollInterval = 1000}: {id: string; token?: string; pol
         etag.current = undefined;
         const operationId = crypto.randomUUID();
         uncertainOperation.current = null;
-        setBusy(true); setActionError(null); setSaved(false);
+        setBusy(true); setActionError(null);
         try {
-            const accepted = await request<Snapshot>(`${path}/${endpoint}`, token, {expectedRevision: snapshot.revision, ...(['commands', 'plans', 'abandonment'].includes(endpoint) ? {operationId} : {}), ...operation});
+            const send = (expectedRevision: number) => request<Snapshot>(`${path}/${endpoint}`, token, {
+                expectedRevision, ...(['commands', 'plans', 'abandonment'].includes(endpoint) ? {operationId} : {}), ...operation,
+            });
+            const accepted = await send(snapshot.revision).catch(async failure => {
+                if (endpoint !== 'plans' || errorCode(failure) !== 'STALE_REVISION') throw failure;
+                const {snapshot: latest} = await requestSnapshot(path, token);
+                if (!latest || latest.status !== snapshot.status || latest.viewerId !== snapshot.viewerId ||
+                    latest.game.turnNumber !== snapshot.game.turnNumber || latest.game.stage !== snapshot.game.stage) throw failure;
+                acceptSnapshot(latest);
+                // The original owner version and preview token still guard the same plan and consequences.
+                return send(latest.revision);
+            });
             acceptSnapshot(accepted);
             activityAt.current = Date.now();
-            setConnectionError(''); setSaved(true); return accepted;
+            setConnectionError(''); return accepted;
         } catch (failure) {
             const code = errorCode(failure);
             if (isAccessFailure(code)) clearAuthorizedSnapshot(code);
@@ -179,7 +190,7 @@ function Game({id, token, pollInterval = 1000}: {id: string; token?: string; pol
 
     if (!snapshot) return <main className="landing panel"><h1><AppLogo/></h1>{connectionError ? <ErrorMessage code={connectionError}/> : <p>{t('game.loading')}</p>}
         <a href="/play">{t('game.new')}</a></main>;
-    return <MapSelectionProvider><GameTable botControls={<BotControls snapshot={snapshot} {...automation}/>} writeAbandonment={(operation, requestId) => mutate('abandonment', {operation, requestId}).then(Boolean)} loadRewindTargets={(revision, before) => request(`${path}/rewind-targets?expectedRevision=${revision}${before == null ? '' : `&before=${before}`}`, token)} snapshot={snapshot} busy={busy} saved={saved}
+    return <MapSelectionProvider><GameTable botAutomation={automation} writeAbandonment={(operation, requestId) => mutate('abandonment', {operation, requestId}).then(Boolean)} loadRewindTargets={(revision, before) => request(`${path}/rewind-targets?expectedRevision=${revision}${before == null ? '' : `&before=${before}`}`, token)} snapshot={snapshot} busy={busy}
         writePlan={(operation, actions, previewToken, expectedVersion = snapshot.planning?.version ?? null) => mutate('plans', {operation, actions, previewToken, expectedVersion})}
         quotePlan={actions => request<PlanningQuote>(`${path}/plans/preview`, token, {expectedRevision: snapshot.revision, actions}, undefined, {readOnly: true})}
         submit={command => mutate('commands', {command, expectedSubmissionVersion: snapshot.submissionVersion ?? null}).then(Boolean)} editHistory={(fromEntry, lines) => mutate('history', {fromEntry, lines}).then(Boolean)} connectionError={connectionError} actionError={actionError}
@@ -196,7 +207,7 @@ export function App() {
     const match = /^\/games\/([0-9a-f-]+)\/?$/.exec(window.location.pathname);
     if (!config) return <main className="landing panel"><h1><AppLogo/></h1>{error ? <ErrorMessage code={error}/> : <p>{t('game.loading')}</p>}</main>;
     if (config.authMode === 'firebase') return <Suspense fallback={<main className="landing panel"><p>{t('game.loading')}</p></main>}><HostedApp config={config} game={match ? <Game id={match[1]} pollInterval={config.pollIntervalMs}/> : null}/></Suspense>;
-    if (!match) return <CreateGame/>;
+    if (!match) return <CreateGame automataVersion={config.automataVersion}/>;
     const token = new URLSearchParams(window.location.hash.slice(1)).get('token');
     return token ? <Game id={match[1]} token={token}/> : <main className="landing panel"><h1><AppLogo/></h1><p role="alert">{t('game.missingToken')}</p><a href="/play">{t('game.new')}</a></main>;
 }

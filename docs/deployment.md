@@ -129,7 +129,7 @@ python3 scripts/game-admin.py --url https://play.example.com --token-file /tmp/a
 historical catalogs. Ordinary play decodes file format **7** only. Recorded catalogs retain their
 topology/matching drawings; unknown combinations never substitute current geometry. Header edits are
 not migrations. [AGENTS.md](../AGENTS.md#invariants) owns preservation requirements;
-[Linear policy conversion](design.md#linear-game) has its separate private-state-preserving contract.
+[Friendly game policy conversion](design.md#friendly-game) has its separate private-state-preserving contract.
 Retired format-6 conversion endpoints/legacy decoders are unavailable; already-upgraded files retain
 audit revisions/exact archives. Unsupported files remain admin-exportable.
 

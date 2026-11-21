@@ -1,7 +1,6 @@
 package dev.aragos.aor
 
 import com.fasterxml.jackson.databind.JsonNode
-import dev.aragos.aor.ai.BotDifficulty
 import io.ktor.server.application.call
 import io.ktor.server.routing.Route
 import io.ktor.server.routing.get
@@ -14,10 +13,10 @@ internal fun JsonNode.automatedPlayers(): List<AutomatedPlayerRequest> {
     if (requests.size > 5) throw ServiceFailure(400, "INVALID_GAME")
     return requests.mapIndexed { index, request ->
         request.fieldsOnly("name", "difficulty")
-        AutomatedPlayerRequest(
-            name = request["name"]?.string()?.trim() ?: "Automated ${index + 1}",
-            difficulty = BotDifficulty.valueOf(request.field("difficulty").string()),
-        )
+        if (request["difficulty"]?.string()?.let { it != "HARD" } == true) {
+            throw ServiceFailure(400, "INVALID_BOT_DIFFICULTY")
+        }
+        AutomatedPlayerRequest(name = request["name"]?.string()?.trim() ?: "Automated ${index + 1}")
     }
 }
 
@@ -26,7 +25,7 @@ internal fun Route.botRoutes(service: GameService, hosted: HostedServices?) {
         call.api {
             val access = call.gameAccess(hosted)
             val body = call.body()
-            body.fieldsOnly("operation", "runnerId", "expectedEpoch")
+            body.fieldsOnly("operation", "runnerId", "expectedEpoch", "pauseAfterPhase")
             val result =
                 withContext(Dispatchers.IO) {
                     BotAutomation.control(
@@ -39,6 +38,7 @@ internal fun Route.botRoutes(service: GameService, hosted: HostedServices?) {
                         operation = body.field("operation").string(),
                         runnerId = body.field("runnerId").string(),
                         expectedEpoch = body["expectedEpoch"]?.integer(),
+                        pauseAfterPhase = body["pauseAfterPhase"]?.boolean(),
                     )
                 }
             call.respondJson(result)

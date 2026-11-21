@@ -29,6 +29,10 @@ fun createConfiguredGameService(environment: Map<String, String> = System.getenv
         LoggerFactory.getLogger("DrawRenaissanceMigration")
             .info("Upgraded Draw Card Renaissance timing for game {}", id)
     }
+    CaravanTransitMigration.run(store).forEach { id ->
+        LoggerFactory.getLogger("CaravanTransitMigration")
+            .info("Upgraded Caravan transit rules for game {}", id)
+    }
     LinearGameMigration.run(store).forEach { id ->
         LoggerFactory.getLogger("LinearGameMigration").info("Upgraded Linear game {}", id)
     }

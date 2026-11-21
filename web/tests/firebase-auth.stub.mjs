@@ -2,7 +2,17 @@
 const auth = {currentUser: null};
 const listeners = new Set();
 const state = window.firebaseTest = {calls: [], popup: null};
-const user = {uid: 'google-player', email: 'player@example.com', getIdToken: async () => 'firebase-id-token'};
+let verificationComplete = true;
+let token = 'firebase-id-token';
+const user = {
+    uid: 'google-player', email: 'player@example.com', emailVerified: true,
+    async reload() {this.emailVerified = verificationComplete;},
+    async getIdToken(force) {
+        if (force && this.emailVerified) token = 'firebase-verified-token';
+        return token;
+    },
+};
+state.setEmailVerified = verified => {verificationComplete = verified;};
 
 function signedIn() {
     auth.currentUser = user;
@@ -43,10 +53,13 @@ export async function signInWithEmailAndPassword(_auth, email, password) {
 }
 export async function createUserWithEmailAndPassword(_auth, email, password) {
     state.calls.push({method: 'createUserWithEmailAndPassword', email, password});
+    verificationComplete = false;
+    user.emailVerified = false;
     return signedIn();
 }
-export async function sendEmailVerification() {
-    state.calls.push({method: 'sendEmailVerification'});
+export async function sendEmailVerification(_user, settings) {
+    state.calls.push({method: 'sendEmailVerification', url: settings?.url ?? null});
+    if (settings && state.rejectContinueUrl) throw {code: 'auth/unauthorized-continue-uri'};
 }
 export async function sendPasswordResetEmail(_auth, email) {
     state.calls.push({method: 'sendPasswordResetEmail', email});

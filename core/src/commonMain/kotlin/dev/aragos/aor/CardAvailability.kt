@@ -7,10 +7,8 @@ package dev.aragos.aor
 internal object CardAvailability {
     fun unplayed(state: GameState): List<CardDefinition> {
         if (state.stage == Stage.CONFIGURATION || state.stage == Stage.SHUFFLE) return emptyList()
-        return Epoch.entries
-            .filter { epoch -> epoch.number <= state.currentEpoch.number }
-            .flatMap(state.rules::cardsForEpoch)
-            .filterNot(state.publiclyDiscardedCards::contains)
-            .map(CardData::definition)
+        val introduced = state.rules.introducedCards(state.currentEpoch)
+        if (state.publiclyDiscardedCards.isEmpty()) return introduced
+        return introduced.filterNot { card -> card.id in state.publiclyDiscardedCards }
     }
 }
