@@ -16,7 +16,6 @@ import {hasPlayerAction, setTurnFavicon} from './favicon';
 import {startPolling} from './polling';
 import {AutomatedOpponents} from './AutomatedOpponents';
 import {useBotAutomation} from './ai/useBotAutomation';
-import {BotControls} from './ai/BotControls';
 import './app.css';
 
 const HostedApp = lazy(() => import('./HostedApp'));
@@ -189,7 +188,7 @@ function Game({id, token, pollInterval = 1000}: {id: string; token?: string; pol
 
     if (!snapshot) return <main className="landing panel"><h1><AppLogo/></h1>{connectionError ? <ErrorMessage code={connectionError}/> : <p>{t('game.loading')}</p>}
         <a href="/play">{t('game.new')}</a></main>;
-    return <MapSelectionProvider><GameTable botControls={<BotControls snapshot={snapshot} {...automation}/>} writeAbandonment={(operation, requestId) => mutate('abandonment', {operation, requestId}).then(Boolean)} loadRewindTargets={(revision, before) => request(`${path}/rewind-targets?expectedRevision=${revision}${before == null ? '' : `&before=${before}`}`, token)} snapshot={snapshot} busy={busy}
+    return <MapSelectionProvider><GameTable botAutomation={automation} writeAbandonment={(operation, requestId) => mutate('abandonment', {operation, requestId}).then(Boolean)} loadRewindTargets={(revision, before) => request(`${path}/rewind-targets?expectedRevision=${revision}${before == null ? '' : `&before=${before}`}`, token)} snapshot={snapshot} busy={busy}
         writePlan={(operation, actions, previewToken, expectedVersion = snapshot.planning?.version ?? null) => mutate('plans', {operation, actions, previewToken, expectedVersion})}
         quotePlan={actions => request<PlanningQuote>(`${path}/plans/preview`, token, {expectedRevision: snapshot.revision, actions}, undefined, {readOnly: true})}
         submit={command => mutate('commands', {command, expectedSubmissionVersion: snapshot.submissionVersion ?? null}).then(Boolean)} editHistory={(fromEntry, lines) => mutate('history', {fromEntry, lines}).then(Boolean)} connectionError={connectionError} actionError={actionError}

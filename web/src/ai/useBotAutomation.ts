@@ -10,6 +10,9 @@ export function useBotAutomation(snapshot: Snapshot | null, token: string | unde
     const [status, setStatus] = useState<BotRunnerStatus>('starting');
     const [operating, setOperating] = useState(false);
     const [blocked, setBlocked] = useState(false);
+    const [phasePauseError, setPhasePauseError] = useState(false);
+    const [savingPhasePause, setSavingPhasePause] = useState(false);
+    const phasePauseRequest = useRef<AbortController | null>(null);
     const runnerId = useRef(crypto.randomUUID());
     const current = useRef({snapshot, changed});
     current.current = {snapshot, changed};
@@ -53,11 +56,14 @@ export function useBotAutomation(snapshot: Snapshot | null, token: string | unde
     }, [gameId, viewer, token, canControl, paused, epoch, ended, operating, blocked, humanBusy]);
 
     useEffect(() => {active.current?.wake();}, [snapshot?.revision, snapshot?.game.activity?.decisionEntry, snapshot?.submissionVersion]);
-    useEffect(() => () => {controls.current?.abort();}, [gameId, viewer, token]);
+    useEffect(() => () => {
+        controls.current?.abort();
+        phasePauseRequest.current?.abort();
+    }, [gameId, viewer, token]);
 
     async function control(operation: 'pause' | 'resume') {
         const live = current.current.snapshot;
-        if (!live?.automation?.canControl || operating) return;
+        if (!live?.automation?.canControl || operating || phasePauseRequest.current) return;
         active.current?.stop();
         setOperating(true);
         const controller = new AbortController();
@@ -78,8 +84,32 @@ export function useBotAutomation(snapshot: Snapshot | null, token: string | unde
             if (controls.current === controller) controls.current = null;
         }
     }
+    async function setPhasePause(enabled: boolean) {
+        const live = current.current.snapshot;
+        if (!live?.automation?.canControl || operating || phasePauseRequest.current) return;
+        const controller = new AbortController();
+        phasePauseRequest.current = controller;
+        setSavingPhasePause(true);
+        setPhasePauseError(false);
+        try {
+            await request<BotWork>(`/api/games/${live.gameId}/bots/runner`, token, {
+                operation: 'set-phase-pause', runnerId: runnerId.current,
+                expectedEpoch: live.automation.epoch, pauseAfterPhase: enabled,
+            }, controller.signal);
+        } catch {
+            if (!controller.signal.aborted) setPhasePauseError(true);
+        } finally {
+            if (!controller.signal.aborted) {
+                try {await current.current.changed();}
+                catch { /* The regular game poll refreshes the setting. */ }
+            }
+            if (phasePauseRequest.current === controller) phasePauseRequest.current = null;
+            if (!controller.signal.aborted) setSavingPhasePause(false);
+        }
+    }
+
     return {
         status: ended ? 'finished' as const : paused ? 'paused' as const : status,
-        operating, control,
+        operating, control, savingPhasePause, phasePauseError, setPhasePause,
     };
 }

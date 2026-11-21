@@ -25,7 +25,7 @@ internal fun Route.botRoutes(service: GameService, hosted: HostedServices?) {
         call.api {
             val access = call.gameAccess(hosted)
             val body = call.body()
-            body.fieldsOnly("operation", "runnerId", "expectedEpoch")
+            body.fieldsOnly("operation", "runnerId", "expectedEpoch", "pauseAfterPhase")
             val result =
                 withContext(Dispatchers.IO) {
                     BotAutomation.control(
@@ -38,6 +38,7 @@ internal fun Route.botRoutes(service: GameService, hosted: HostedServices?) {
                         operation = body.field("operation").string(),
                         runnerId = body.field("runnerId").string(),
                         expectedEpoch = body["expectedEpoch"]?.integer(),
+                        pauseAfterPhase = body["pauseAfterPhase"]?.boolean(),
                     )
                 }
             call.respondJson(result)

@@ -134,6 +134,13 @@ edits retain the runner and its pause state. Other edits and rewinds pause bots 
 epoch until explicit resume. Completion and closure stop bots. Creator abandonment records
 separate bot consent. Each human still consents.
 
+The creator can enable phase pauses in Game options. The server pauses the runner atomically
+when the table completes a phase containing a committed automated decision in public Activity.
+Sealed decisions count on reveal, and ties belong to their bidding or token-purchase phase.
+Urban Ascendancy card purchases, passes omitted from Activity, and automatic outcomes do not
+trigger a pause. Human play remains available. The phase pause and setting survive reload;
+resuming clears the pause and keeps the setting. Older saves default to continuous play.
+
 [The worker](../web/src/ai/botWorker.ts) selects one hashed, immutable checkpoint model by
 policy version and player count. The November 21 Hard policy uses the same assets as November 20.
 Its controller prices expected market income and adjusts initiative by table size and opening.

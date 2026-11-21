@@ -52,6 +52,8 @@ data class BotOperationReceipt(
 /**
  * Browser leases last 30 seconds. [epoch] fences every earlier owner after release or takeover.
  * Receipts are bounded reconciliation facts and survive rewind; they never replay bot decisions.
+ * [pauseAfterPhase] is the creator's game-wide pacing setting. [pausedAfterPhase] records the
+ * completed table phase for a phase-induced pause, until explicit resume or another pause.
  */
 data class BotRunnerState(
     val epoch: Int = 0,
@@ -59,6 +61,8 @@ data class BotRunnerState(
     val runnerId: String? = null,
     val leaseUntil: Long = 0,
     val receipts: List<BotOperationReceipt> = emptyList(),
+    val pauseAfterPhase: Boolean = false,
+    val pausedAfterPhase: Stage? = null,
 ) {
     init {
         require(epoch >= 0 && leaseUntil >= 0) {
@@ -66,6 +70,9 @@ data class BotRunnerState(
         }
         require((runnerId == null) == (leaseUntil == 0L)) {
             "A browser lease requires both its runner identity and deadline."
+        }
+        require(pausedAfterPhase == null || paused) {
+            "A completed phase can only be the reason for a paused browser runner."
         }
         require(!paused || runnerId == null) {
             "Paused automated players cannot retain an active browser lease."
@@ -94,6 +101,8 @@ data class AutomationView(
     val canControl: Boolean,
     val paused: Boolean,
     val epoch: Int,
+    val pauseAfterPhase: Boolean,
+    val pausedAfterPhase: Stage?,
 )
 
 data class BotDecisionWork(
@@ -118,6 +127,14 @@ data class BotWork(
     val operationReceipts: List<String>,
 )
 
+/** Tie resolution belongs to the corresponding phase in the table timeline. */
+internal fun Stage.tablePhase(): Stage =
+    when (this) {
+        Stage.CAPITAL_TIE -> Stage.BIDDING
+        Stage.TURN_ORDER_TIE -> Stage.TOKEN_PURCHASE
+        else -> this
+    }
+
 /** Fenced automated decisions use the ordinary authority driver under the game lock. */
 internal object BotAutomation {
     private const val LEASE_MILLIS = 30000L
@@ -139,16 +156,32 @@ internal object BotAutomation {
             canControl = viewer == game.header.creatorId && active(game),
             paused = runner.paused || !active(game),
             epoch = runner.epoch,
+            pauseAfterPhase = runner.pauseAfterPhase,
+            pausedAfterPhase = runner.pausedAfterPhase,
         )
     }
 
-    fun pause(game: StoredGame): StoredGame {
+    /** Called on the ordinary append path, including a phase closed by a human or a plan. */
+    fun afterCommit(game: StoredGame, before: GameState, after: GameState): StoredGame {
+        val runner = game.botRunner ?: return game
+        if (!runner.pauseAfterPhase || runner.paused || after.stage == Stage.FINISHED) return game
+        val phase = before.stage.tablePhase()
+        if (phase == after.stage.tablePhase() && before.turnNumber == after.turnNumber) return game
+        return if (HistoryProjection.hasAutomatedDecision(game, phase, before.turnNumber)) {
+            pause(game, phase)
+        } else {
+            game
+        }
+    }
+
+    fun pause(game: StoredGame, completedPhase: Stage? = null): StoredGame {
         val runner = game.botRunner ?: return game
         return game.copy(
             botRunner =
                 runner.copy(
                     epoch = nextEpoch(runner),
                     paused = true,
+                    pausedAfterPhase = completedPhase,
                     runnerId = null,
                     leaseUntil = 0,
                 )
@@ -183,8 +216,12 @@ internal object BotAutomation {
         runnerId: String,
         expectedEpoch: Int?,
         now: Long = System.currentTimeMillis(),
+        pauseAfterPhase: Boolean? = null,
     ): BotWork {
         requireUuid(runnerId)
+        if ((operation == "set-phase-pause") != (pauseAfterPhase != null)) {
+            throw ServiceFailure(400, "INVALID_REQUEST")
+        }
         val stored =
             service.store.update(id) { current ->
                 requireCreator(service, current, access)
@@ -200,6 +237,10 @@ internal object BotAutomation {
                 }
                 when (operation) {
                     "pause" -> pause(current)
+                    "set-phase-pause" ->
+                        current.copy(
+                            botRunner = runner.copy(pauseAfterPhase = pauseAfterPhase == true)
+                        )
                     "release" -> {
                         if (runner.runnerId != runnerId)
                             throw ServiceFailure(409, "BOT_RUNNER_BUSY")
@@ -240,6 +281,7 @@ internal object BotAutomation {
                                                 runner.epoch
                                             } else nextEpoch(runner),
                                         paused = false,
+                                        pausedAfterPhase = null,
                                         runnerId = runnerId,
                                         leaseUntil = now + LEASE_MILLIS,
                                     )
@@ -263,7 +305,9 @@ internal object BotAutomation {
         val game = service.store.read(id)
         requireCreator(service, game, access)
         val runner = requireRunner(game)
-        if (runner.epoch != epoch) throw ServiceFailure(409, "BOT_STALE_EPOCH")
+        // A command that caused a phase pause can reconcile a lost response against its receipt.
+        val phasePause = runner.pausedAfterPhase != null && epoch == runner.epoch - 1
+        if (runner.epoch != epoch && !phasePause) throw ServiceFailure(409, "BOT_STALE_EPOCH")
         if (!runner.paused && active(game)) requireLease(game, runnerId, epoch, now)
         return work(game, now)
     }

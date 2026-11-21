@@ -1,5 +1,4 @@
 import {useEffect, useLayoutEffect, useRef, useState} from 'react';
-import type {ReactNode} from 'react';
 import type {ApiError, Snapshot, TokenPurchaseQuoteResponse} from './api';
 import {LabelMessage, PlayerLabel, PlayerLabels, ProvinceLabel} from './IdentityLabel';
 import {label, purchasePassLabel} from './labels';
@@ -11,6 +10,8 @@ import {TableTools} from './TableTools';
 import {Activity, ActionResultNotice} from './Activity';
 import {TableIcon} from './TableIcon';
 import {PhaseTimeline} from './PhaseTimeline';
+import {BotControls, BotPhasePause} from './ai/BotControls';
+import type {BotControlState} from './ai/BotControls';
 import {FinalScores} from './FullGamePanels';
 import {AdvanceTiles, PlayerOverview, Markets} from './TablePanels';
 import {Hand} from './Hand';
@@ -43,12 +44,12 @@ export type QuotePurchase = (amount: number) => Promise<PurchaseQuote>;
 const ACTIVITY_PIN_QUERY = '(min-width: 1400px)';
 const MOBILE_QUERY = '(max-width: 700px)';
 
-export function GameTable({snapshot: liveSnapshot, busy: requestBusy, submit: sendCommand, connectionError, actionError, quotePurchase, editHistory, writePlan, quotePlan, loadRewindTargets, writeAbandonment, botControls}: {
+export function GameTable({snapshot: liveSnapshot, busy: requestBusy, submit: sendCommand, connectionError, actionError, quotePurchase, editHistory, writePlan, quotePlan, loadRewindTargets, writeAbandonment, botAutomation}: {
     snapshot: Snapshot; busy: boolean; submit: (command: string) => Promise<boolean>;
     connectionError: string; actionError: ApiError | null; quotePurchase: QuotePurchase;
     editHistory?: (fromEntry: number, lines: string[]) => Promise<boolean>;
     writePlan?: WritePlan; quotePlan?: QuotePlan; loadRewindTargets?: LoadRewindTargets; writeAbandonment?: WriteAbandonment;
-    botControls?: ReactNode;
+    botAutomation?: BotControlState;
 }) {
     const personalOptions = usePersonalOptions(liveSnapshot, requestBusy, sendCommand);
     const planner = useActivityPlanner(liveSnapshot, writePlan, quotePlan);
@@ -101,6 +102,15 @@ export function GameTable({snapshot: liveSnapshot, busy: requestBusy, submit: se
         'map', 'markets', 'advances', ...(activityPinned ? [] : ['activity'] as const),
         ...(mobile ? ['players'] as const : []),
     ];
+    function openActivity() {
+        if (activityPinned) {
+            setMapExpanded(false);
+            requestAnimationFrame(() => document.getElementById('workspace-activity')?.focus());
+        } else {
+            setWorkspace('activity');
+            document.getElementById('tab-activity')?.focus();
+        }
+    }
     function toggleActivityPin() {
         setPinActivity(!activityPinned);
         setWorkspace(activityPinned ? 'activity' : previousWorkspace.current);
@@ -205,7 +215,7 @@ export function GameTable({snapshot: liveSnapshot, busy: requestBusy, submit: se
                 <dt>{t(`option.${option.key}`)}</dt><dd>{t(`optionValue.${option.value}`)}</dd>
             </div>)}</dl>
             {writeAbandonment && <AbandonmentTools snapshot={liveSnapshot} busy={requestBusy} write={writeAbandonment}/>}
-            {botControls}
+            {botAutomation && <BotControls snapshot={liveSnapshot} {...botAutomation}/>}
         </div>}
         commands={!spectator && <CommandDock snapshot={snapshot} busy={busy} submit={submit} editHistory={editHistory}/>}/>;
     return <ReferenceCatalogContext.Provider value={snapshot.game.catalog}>
@@ -234,6 +244,8 @@ export function GameTable({snapshot: liveSnapshot, busy: requestBusy, submit: se
                 {finished && <button type="button" className="secondary final-scores-toggle" onClick={() => setScoresOpen(true)}>{t('game.finalScores')}</button>}
                 <AccountControls showGames={false}/>
             </header>
+            <BotPhasePause snapshot={liveSnapshot} controls={botAutomation}
+                openActivity={activityPinned && !expandedMap ? undefined : openActivity}/>
             {inactive && <p className="ending-notice" role="status">{snapshot.status === 'ABANDONED' && snapshot.events.some(event => event.kind === 'ABANDONMENT_AGREE' && event.detail === 'UNANIMOUS') ? t('abandonment.ended') : t('hosted.inactive', {status: t(`gameStatus.${snapshot.status}`).toLowerCase()})}</p>}
             {connectionError && <p className="error connection-error" role="alert">{t(`error.${connectionError}`)}</p>}
         </div>

@@ -261,7 +261,7 @@ export function Activity({snapshot, onInspectCard, active, pinned, canPin, onTog
 }) {
     const rows = activityRows(snapshot.events).filter(row => row[0].kind !== 'PASS');
     const pinLabel = t(pinned ? 'table.unpinActivity' : 'table.pinActivity');
-    return <section id="workspace-activity" className="table-activity" hidden={!active && !pinned}
+    return <section id="workspace-activity" className="table-activity" hidden={!active && !pinned} tabIndex={-1}
         role={pinned ? 'region' : 'tabpanel'} aria-label={pinned ? t('table.activity') : undefined}
         aria-labelledby={pinned ? undefined : 'tab-activity'}>
         {canPin && <button type="button" className="secondary activity-pin" title={pinLabel}

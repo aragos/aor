@@ -168,6 +168,12 @@ internal object GameDocuments {
                     BotRunnerState(
                         epoch = runner.field("epoch").integer(),
                         paused = runner.field("paused").boolean(),
+                        pauseAfterPhase = runner["pauseAfterPhase"]?.boolean() ?: false,
+                        pausedAfterPhase =
+                            runner["pausedAfterPhase"]
+                                ?.takeUnless(JsonNode::isNull)
+                                ?.string()
+                                ?.let(Stage::valueOf),
                         runnerId = runner["runnerId"]?.takeUnless(JsonNode::isNull)?.string(),
                         leaseUntil = runner.field("leaseUntil").longInteger(),
                         receipts =
