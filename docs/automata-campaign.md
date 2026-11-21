@@ -1,14 +1,15 @@
 # Current-rules Hard campaign
 
-The campaign compares browser-compatible Hard opponents in full games under the same engine that
-serves new tables. The November 21 starting policy uses the November 20 assets with the market and
-initiative settings confirmed separately for three, four, five and six players. Existing tables
-retain their saved controller version. Use a new game to playtest a new controller.
+The campaign compares browser-compatible Hard opponents in full games under the rules for new
+tables. Job specifications call the November 20 controller `shipped` and the November 21 starting
+incumbent `market`. They share the November 20 assets. The November 21 controller adds the market
+and initiative settings qualified separately for three, four, five and six players. Existing
+tables retain their saved controller version.
 
 ## Prepare and run
 
-From the feature checkout, build the JVM simulator. The Mac
-coordinator needs Node, JDK 21 or later, Python, SSH and rsync. Callisto needs Java, Python and its
+Build the JVM simulator from the feature checkout. The Mac coordinator needs Node, JDK 21 or
+later, Python, SSH and rsync. Callisto needs Java, Python and its
 existing CUDA PyTorch environment. The prepared bundle pins the evaluator, assets, scripts,
 browser comparator and starting policies by SHA-256. For optimized discovery, pass the frozen
 release qualification bundle as the reference. Its original JVM evaluator runs every sealed final
@@ -40,21 +41,21 @@ Override the worker address or PyTorch interpreters with `--callisto`, `--gpu-py
 
 ## Games, workers and selection
 
-The Mac runs six simulation workers and Callisto ten. Each host takes the next available shard. Each has
-a 6 GiB JVM heap. The Mac keeps 10 GiB of free disk and Callisto 20 GiB. The coordinator fits a bounded expansion scorer from
-matched terminal continuations. The local CPU is the first choice for this twelve-input scorer.
-The RTX 4090 takes over if that interpreter is unavailable. Use `--fit-first cuda` to reverse
-the order. Validation scores the legal alternatives from many origins in one batch, keeping the
-original strict adoption threshold and tie order. Ordinary game execution and online inference run
-on CPUs.
+The Mac runs six simulation workers and Callisto ten, with a 6 GiB JVM heap per host. Each host
+takes the next available shard. The Mac keeps 10 GiB of free disk and Callisto 20 GiB.
+
+The coordinator fits a twelve-input expansion scorer from matched terminal continuations. It tries
+local CPU PyTorch first and uses the RTX 4090 on failure. Use `--fit-first cuda` to reverse the
+order. Validation scores the legal alternatives from many origins in one batch, keeping the
+strict adoption threshold and tie order. Game execution and online inference run on CPUs.
 
 For each table size, challengers vary market-marker income, commodity opportunity and initiative
 together. On alternate generations the learner samples at least 4,096 originating worlds, then
 compares up to three legal alternatives to the ordinary expansion. It attempts four matched
 continuations for each choice at the sampled position. Each origin has one sampled hidden world.
-The simulator retains its immutable state at the selected expansion and plays each continuation from there, using the same future chance seed
-and absolute decision index as a complete replay.
-All its alternatives and continuations stay in the same partition. Some games never present
+The simulator retains the immutable game state at the selected expansion. Each continuation uses
+the same future chance seed and absolute decision index as a replay from setup. All alternatives
+and continuations for an origin stay in the same partition. Some games never present
 an eligible alternative. A correction enters whole-game screening only if it improves held-out
 terminal win share. The trained coefficients fit in a versioned browser model.
 
