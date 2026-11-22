@@ -3,10 +3,9 @@ package dev.aragos.aor
 import dev.aragos.aor.ai.BotDifficulty
 import dev.aragos.aor.ai.BotObservation
 import dev.aragos.aor.ai.BotObservations
-import dev.aragos.aor.ai.HARD_AUTOMATA_VERSION
-import dev.aragos.aor.ai.PREVIOUS_HARD_AUTOMATA_VERSION
 import dev.aragos.aor.ai.PhaseInitiativeInput
 import dev.aragos.aor.ai.PhaseInitiativePolicy
+import dev.aragos.aor.ai.hardCheckpointVersions
 import java.security.MessageDigest
 import java.util.UUID
 
@@ -484,15 +483,13 @@ internal object BotAutomation {
                         val decision = decisionId(game, seat)
                         val state = game.state()
                         val observation = BotObservations.from(state, seat)
-                        val current =
-                            bot.policyVersion == HARD_AUTOMATA_VERSION ||
-                                bot.policyVersion == PREVIOUS_HARD_AUTOMATA_VERSION
+                        val checkpoint = bot.policyVersion in hardCheckpointVersions
                         val initiative =
-                            if (current && observation.decision == "buy-tokens") {
+                            if (checkpoint && observation.decision == "buy-tokens") {
                                 PhaseInitiativePolicy.project(state.viewForDecision(seat), seat)
                             } else null
                         val finish =
-                            if (current && observation.decision == "purchase-advances") {
+                            if (checkpoint && observation.decision == "purchase-advances") {
                                 FinalAdvancePlan.quote(state, state.viewForDecision(seat), seat)
                             } else null
                         BotDecisionWork(

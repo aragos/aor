@@ -1,5 +1,8 @@
 import assert from 'node:assert/strict';
+import {createHash} from 'node:crypto';
+import {readFile} from 'node:fs/promises';
 import {test} from 'node:test';
+import {hardCheckpoint} from '../src/ai/hardCheckpoints.ts';
 import {createBotWorkerClient} from '../src/ai/botWorkerClient.ts';
 
 function fixture(context) {
@@ -54,4 +57,26 @@ test('one worker is reused for serial decisions', async context => {
 
     assert.equal(await second, 'second');
     assert.equal(workers.length, 1);
+});
+
+const original = 'aor-hard-2026-11-20-1';
+const market = 'aor-hard-2026-11-21-1';
+const expansion = 'aor-hard-2026-11-22-1';
+
+test('only the four-player expansion seat loads the qualified model', async () => {
+    const model = hardCheckpoint(expansion, 4);
+    const bytes = await readFile(new URL('../public' + model.url, import.meta.url));
+    assert.equal(model.market, true);
+    assert.equal(createHash('sha256').update(bytes).digest('hex'), model.sha256);
+    assert.equal(model.sha256, '06308b32b3ef40bf12c83f9383ed0a306b7bf475f1bb163e6c4f063e429f48eb');
+    for (const count of [3, 5, 6]) {
+        assert.deepEqual(hardCheckpoint(expansion, count), hardCheckpoint(market, count));
+    }
+});
+
+test('saved four-player seats select their original market settings and asset', () => {
+    const previous = hardCheckpoint(original, 4);
+    assert.equal(previous.market, false);
+    assert.equal(previous.sha256, '956b39695f744ce835a72af6452e33d061b74479a8b13938e3b968f18ce4556e');
+    assert.deepEqual(hardCheckpoint(market, 4), {...previous, market: true});
 });
