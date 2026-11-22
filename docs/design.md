@@ -147,11 +147,10 @@ action and holds those outcomes. Resume appends the outcomes in a new authority 
 keeps expansion bonus draws and analogous next-phase draws or rolls out of Activity until resume.
 
 [The worker](../web/src/ai/botWorker.ts) selects one hashed, immutable checkpoint model by
-policy version and player count. The November 21 Hard policy uses the same assets as November 20.
-Its controller prices expected market income and adjusts initiative by table size and opening.
-Existing Hard seats keep their recorded controller on reload and continue receiving initiative and
-finish quotes. The three published assets total 304 KiB, with 90–123 KiB
-uncompressed downloaded once per applicable worker (HTTP caching reuses the versioned URL).
+policy version and player count. New four-player tables use the November 22 expansion checkpoint.
+Three-, five- and six-player tables use the November 21 market and initiative settings. Saved seats select their recorded
+controller and continue receiving initiative and finish quotes. Each worker downloads one
+model per applicable version and player count. HTTP caching reuses each immutable asset URL.
 Startup, setup, human-only games and read-only visits do not initialize the worker or fetch the
 models. Replays use recorded commands and outcomes. Keep older policy files available while
 saved games reference them. [Training](contributing.md#opponent-training) runs independently of

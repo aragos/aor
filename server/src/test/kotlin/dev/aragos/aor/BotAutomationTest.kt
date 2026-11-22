@@ -4,7 +4,6 @@ import com.fasterxml.jackson.databind.node.ObjectNode
 import com.google.common.truth.Truth.assertThat
 import dev.aragos.aor.ai.BOT_POLICY_VERSION
 import dev.aragos.aor.ai.BotDifficulty
-import dev.aragos.aor.ai.PREVIOUS_HARD_AUTOMATA_VERSION
 import java.nio.file.Files
 import java.util.UUID
 import java.util.concurrent.Callable
@@ -42,7 +41,14 @@ class BotAutomationTest(private val postgres: Boolean) {
 
     @Test
     fun storedNovember20HardSeatCanResumeAndSubmitItsSealedBid() =
-        AutomationFixture(postgres, version = PREVIOUS_HARD_AUTOMATA_VERSION).use { fixture ->
+        resumeStoredCheckpoint("aor-hard-2026-11-20-1")
+
+    @Test
+    fun storedNovember21HardSeatCanResumeAndSubmitItsSealedBid() =
+        resumeStoredCheckpoint("aor-hard-2026-11-21-1")
+
+    private fun resumeStoredCheckpoint(version: String) {
+        AutomationFixture(postgres, version = version).use { fixture ->
             val service = fixture.reopened()
             val gameId = fixture.game.gameId
             val work =
@@ -72,11 +78,11 @@ class BotAutomationTest(private val postgres: Boolean) {
             )
 
             val stored = fixture.reopened().store.read(gameId)
-            assertThat(job.policyVersion).isEqualTo(PREVIOUS_HARD_AUTOMATA_VERSION)
-            assertThat(stored.bots[job.seat]?.policyVersion)
-                .isEqualTo(PREVIOUS_HARD_AUTOMATA_VERSION)
+            assertThat(job.policyVersion).isEqualTo(version)
+            assertThat(stored.bots[job.seat]?.policyVersion).isEqualTo(version)
             assertThat(stored.pendingBids.keys).contains(job.seat)
         }
+    }
 
     @Test
     fun anotherHumanCannotReadAutomatedPrivateObservations() =

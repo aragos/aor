@@ -1,3 +1,4 @@
+import {hardCheckpoint} from './hardCheckpoints';
 import type {HardBotSelector} from 'aor-ai';
 
 type Job = {
@@ -11,38 +12,12 @@ type Job = {
 };
 
 const legacyVersion = 'aor-policy-1';
-const previousHardVersion = 'aor-hard-2026-11-20-1';
-const hardVersion = 'aor-hard-2026-11-21-1';
-const threePlayer = {
-    url: '/assets/automata/aor-hard-2026-11-20-1/three-player-continuation-model.json',
-    sha256: '7446542a3e85f3db8b31d0fda632ae0d4f1ff809188b68cfda5899841ff57624',
-};
-const fourAndFivePlayer = {
-    url: '/assets/automata/aor-hard-2026-11-20-1/continuation-model.json',
-    sha256: '956b39695f744ce835a72af6452e33d061b74479a8b13938e3b968f18ce4556e',
-};
-const sixPlayer = {
-    url: '/assets/automata/aor-hard-2026-11-20-1/broad-model.json',
-    sha256: 'a479db4b3c7f580ce9979049fe407cbde4db22bf75b76d3cc54ac6f2039ce500',
-};
 const modelByteLimit = 150_000;
 const selectors = new Map<string, Promise<HardBotSelector>>();
 let legacyModel: Promise<string> | undefined;
 
-function checkpointAsset(version: string, playerCount: number) {
-    if (version === previousHardVersion || version === hardVersion) {
-        switch (playerCount) {
-            case 3: return threePlayer;
-            case 4:
-            case 5: return fourAndFivePlayer;
-            case 6: return sixPlayer;
-        }
-    }
-    throw new Error('This game requires an unavailable automated opponent checkpoint.');
-}
-
 async function loadCheckpoint(version: string, playerCount: number): Promise<HardBotSelector> {
-    const asset = checkpointAsset(version, playerCount);
+    const asset = hardCheckpoint(version, playerCount);
     const response = await fetch(asset.url, {credentials: 'omit'});
     if (!response.ok) throw new Error('The automated opponent checkpoint is unavailable.');
     const bytes = await response.arrayBuffer();
@@ -53,7 +28,7 @@ async function loadCheckpoint(version: string, playerCount: number): Promise<Har
     const hash = Array.from(new Uint8Array(digest), byte => byte.toString(16).padStart(2, '0')).join('');
     if (hash !== asset.sha256) throw new Error('The automated opponent checkpoint failed verification.');
     const {HardBotSelector} = await import('aor-ai');
-    return new HardBotSelector(new TextDecoder().decode(bytes), playerCount, version === hardVersion);
+    return new HardBotSelector(new TextDecoder().decode(bytes), playerCount, asset.market);
 }
 
 async function choose(job: Job): Promise<string> {

@@ -265,6 +265,20 @@ try {
     await waitState(snapshot => snapshot.status === 'ABANDONED', 'creator consent includes separate bot agreements');
     await page.wait(`document.querySelector('.bot-controls').textContent.includes('ended')`, 'terminal automation status');
     assert.equal(await page.evaluate(`document.querySelector('.bot-controls button') === null`), true, 'Closed games expose no automation mutation');
+    const fourPlayer = await fetch(api + '/api/games', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({players: ['Ada'], bots: [{}, {}, {}]}),
+    });
+    assert.equal(fourPlayer.status, 201);
+    const created = await fourPlayer.json();
+    gameId = created.gameId;
+    const playerPath = created.links[0].path;
+    token = new URLSearchParams(playerPath.split('#')[1]).get('token');
+    await page.send('Page.navigate', {url: web + playerPath});
+    const fourPlayerState = await waitState(snapshot => snapshot.submitted.length === 3,
+        'the released four-player worker submits all three private opening bids');
+    assert(fourPlayerState.automation.players.every(bot => bot.policyVersion === 'aor-hard-2026-11-22-1'));
     console.log('Local automated opponents passed: fixed-Hard creation, versioned worker decisions, private bids, draft preservation, single-tab lease/takeover, setup and token flow, pending-worker rewind, explicit resume, phone layout and final abandonment.');
 } finally {
     page.ws.close();
