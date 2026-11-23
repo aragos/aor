@@ -147,8 +147,8 @@ action and holds those outcomes. Resume appends the outcomes in a new authority 
 keeps expansion bonus draws and analogous next-phase draws or rolls out of Activity until resume.
 
 [The worker](../web/src/ai/botWorker.ts) selects one hashed, immutable checkpoint model by
-policy version and player count. New four-player tables use the November 22 expansion checkpoint.
-Three-, five- and six-player tables use the November 21 market and initiative settings. Saved seats select their recorded
+policy version and player count. New three-, four- and five-player tables use their qualified November 22 expansion checkpoints.
+Six-player tables use the November 21 market and initiative settings. Saved seats select their recorded
 controller and continue receiving initiative and finish quotes. Each worker downloads one
 model per applicable version and player count. HTTP caching reuses each immutable asset URL.
 Startup, setup, human-only games and read-only visits do not initialize the worker or fetch the
