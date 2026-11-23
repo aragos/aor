@@ -13,11 +13,16 @@ import kotlin.math.abs
 const val BOT_POLICY_VERSION = "aor-policy-1"
 
 /** Controller identity stored with each seat using the evaluated browser checkpoint. */
-const val HARD_AUTOMATA_VERSION = "aor-hard-2026-11-22-1"
+const val HARD_AUTOMATA_VERSION = "aor-hard-2026-11-22-2"
 
 /** Stored controller identities that consume initiative and finish quotes from the authority. */
 val hardCheckpointVersions: Set<String> =
-    setOf("aor-hard-2026-11-20-1", "aor-hard-2026-11-21-1", HARD_AUTOMATA_VERSION)
+    setOf(
+        "aor-hard-2026-11-20-1",
+        "aor-hard-2026-11-21-1",
+        "aor-hard-2026-11-22-1",
+        HARD_AUTOMATA_VERSION,
+    )
 
 /** Controller strength is independent of the rules and the engine's player identity. */
 enum class BotDifficulty {

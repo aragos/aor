@@ -47,6 +47,10 @@ class BotAutomationTest(private val postgres: Boolean) {
     fun storedNovember21HardSeatCanResumeAndSubmitItsSealedBid() =
         resumeStoredCheckpoint("aor-hard-2026-11-21-1")
 
+    @Test
+    fun storedFourPlayerExpansionVersionCanResumeAndSubmitItsSealedBid() =
+        resumeStoredCheckpoint("aor-hard-2026-11-22-1")
+
     private fun resumeStoredCheckpoint(version: String) {
         AutomationFixture(postgres, version = version).use { fixture ->
             val service = fixture.reopened()
